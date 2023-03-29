@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "dotenv-flow": "^3.2.0",
+    "esno": "^0.16.3",
+    "https-proxy-agent": "^5.0.1",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@types/dotenv-flow": "^3.2.0",
+    "@types/lodash": "^4.14.192"
+  },
+  "scripts": {
+    "server": "esno server.ts"
+  }
+}
