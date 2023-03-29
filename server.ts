@@ -7,23 +7,23 @@ import { URL } from 'url'
 
 dotenvFlow.config()
 
-interface Config {
-  remote_url: string
-  remote_authorization: string | null
-
-  local_auth_token: string | null
-  local_path_prefix: string
-
-  https_proxy: string | null
+const config = {
+  remote_url: null! as string,
+  remote_authorization: null as string | null,
+  local_auth_token: null as string | null,
+  local_path_prefix: "/" as string,
+  https_proxy: null as string | null,
 }
 
-const config = {} as Config
-for (const key of [ 'LOCAL_PATH_PREFIX', 'LOCAL_AUTH_TOKEN', 'REMOTE_URL', 'REMOTE_AUTHORIZATION', 'https_proxy' ]) {
-  const value = process.env[key]
-  config[key.toLowerCase()] = _.isEmpty(value) ? null : value
-}
-config.local_path_prefix ||= "/"
 
+for (const key in config) {
+  config[key] = process.env[key] || process.env[key.toUpperCase()]
+}
+if (_.isEmpty(config.local_path_prefix)) {
+  config.local_path_prefix = "/"
+}
+
+console.log("Config is", config);
 
 const remoteUrl = new URL(config.remote_url);
 if (remoteUrl.protocol != "https:") {
