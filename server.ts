@@ -36,6 +36,7 @@ if (remoteUrl.protocol != "https:") {
 
 const server = http.createServer((req, res) => {
   consola.info(`Request received: ${req.method} ${req.url}`);
+  consola.debug(`Request headers: `, req.headers);
 
   if (config.local_auth_token && !_.includes(req.headers.authorization, config.local_auth_token)) {
     consola.info("Request auth token is invalid")
