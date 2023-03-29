@@ -3,28 +3,69 @@ import https from 'https'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 import dotenvFlow from 'dotenv-flow'
 import _ from 'lodash'
+import { URL } from 'url'
 
 dotenvFlow.config()
+
+interface Config {
+  remote_url: string
+  remote_authorization: string | null
+
+  local_auth_token: string | null
+  local_path_prefix: string
+
+  https_proxy: string | null
+}
+
+const config = {} as Config
+for (const key of [ 'LOCAL_PATH_PREFIX', 'LOCAL_AUTH_TOKEN', 'REMOTE_URL', 'REMOTE_AUTHORIZATION', 'https_proxy' ]) {
+  const value = process.env[key]
+  config[key.toLowerCase()] = _.isEmpty(value) ? null : value
+}
+config.local_path_prefix ||= "/"
+
+
+const remoteUrl = new URL(config.remote_url);
+if (remoteUrl.protocol != "https:") {
+  throw new Error("Only https is supported")
+}
 
 const server = http.createServer((req, res) => {
   console.log(`Request received: ${req.method} ${req.url}`);
 
+  if (config.local_auth_token && !_.includes(req.headers.authorization, config.local_auth_token)) {
+    console.log("Request auth token is invalid")
+    res.statusCode = 401
+    res.end("Unauthorized")
+    return
+  }
+
+  let path = req.url
+  if (!_.startsWith(path, config.local_path_prefix)) {
+    res.statusCode = 404
+    res.end("Not found")
+    return
+  }
+
+  path = _.trimStart(path, config.local_path_prefix)
+  path = remoteUrl.pathname + path
+
   const opts = {
-    hostname: 'api.openai.com',
-    port: 443,
-    path: req.url,
+    hostname: remoteUrl.hostname,
+    port: parseInt(remoteUrl.port) || 443,
+    path: path,
     method: req.method,
     headers: req.headers
   }
 
   delete opts.headers['host']
 
-  if (!_.isEmpty(process.env.REMOTE_AUTHORIZATION)) {
-    opts.headers['authorization'] = process.env.REMOTE_AUTHORIZATION
+  if (config.remote_authorization) {
+    opts.headers['authorization'] = config.remote_authorization
   }
 
-  if (!_.isEmpty(process.env.https_proxy)) {
-    opts['agent'] = new HttpsProxyAgent(process.env.https_proxy!);
+  if (config.https_proxy) {
+    opts['agent'] = new HttpsProxyAgent(config.https_proxy);
   }
 
   const proxyReq = https.request(opts, (proxyRes) => {
