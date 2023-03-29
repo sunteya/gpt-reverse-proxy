@@ -3,6 +3,7 @@ import https from 'https'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 import dotenvFlow from 'dotenv-flow'
 import _ from 'lodash'
+import consola, { LogLevel } from 'consola'
 import { URL } from 'url'
 
 dotenvFlow.config()
@@ -10,20 +11,23 @@ dotenvFlow.config()
 const config = {
   remote_url: null! as string,
   remote_authorization: null as string | null,
+
   local_auth_token: null as string | null,
   local_path_prefix: "/" as string,
+
   https_proxy: null as string | null,
+  log_level: "Info" as string
 }
 
-
 for (const key in config) {
-  config[key] = process.env[key] || process.env[key.toUpperCase()]
+  config[key] = process.env[key] ?? process.env[key.toUpperCase()] ?? config[key]
 }
 if (_.isEmpty(config.local_path_prefix)) {
   config.local_path_prefix = "/"
 }
 
-console.log("Config is", config);
+consola.level = LogLevel[config.log_level] ?? LogLevel.Info
+consola.info("Config is", config);
 
 const remoteUrl = new URL(config.remote_url);
 if (remoteUrl.protocol != "https:") {
@@ -31,10 +35,10 @@ if (remoteUrl.protocol != "https:") {
 }
 
 const server = http.createServer((req, res) => {
-  console.log(`Request received: ${req.method} ${req.url}`);
+  consola.info(`Request received: ${req.method} ${req.url}`);
 
   if (config.local_auth_token && !_.includes(req.headers.authorization, config.local_auth_token)) {
-    console.log("Request auth token is invalid")
+    consola.info("Request auth token is invalid")
     res.statusCode = 401
     res.end("Unauthorized")
     return
@@ -42,6 +46,7 @@ const server = http.createServer((req, res) => {
 
   let path = req.url
   if (!_.startsWith(path, config.local_path_prefix)) {
+    consola.info("Request path not match prefix.")
     res.statusCode = 404
     res.end("Not found")
     return
@@ -69,31 +74,31 @@ const server = http.createServer((req, res) => {
   }
 
   const proxyReq = https.request(opts, (proxyRes) => {
-    console.log(`Proxy response received: ${proxyRes.statusCode} ${proxyRes.statusMessage}`);
+    consola.info(`Proxy response received: ${proxyRes.statusCode} ${proxyRes.statusMessage}`);
     res.writeHead(proxyRes.statusCode || 500, proxyRes.headers)
 
     proxyRes.on('data', (chunk) => {
-      console.log(`Received data from proxy: ${chunk}`);
+      consola.debug(`Received data from proxy: ${chunk}`);
       res.write(chunk);
     });
 
     proxyRes.on('end', () => {
-      console.log('Proxy response ended');
+      consola.debug('Proxy response ended');
       res.end();
     });
   })
 
   req.on('data', (chunk) => {
-    console.log(`Received data from client: ${chunk}`);
+    consola.debug(`Received data from client: ${chunk}`);
     proxyReq.write(chunk);
   });
 
   req.on('end', () => {
-    console.log('Request ended');
+    consola.debug('Request ended');
     proxyReq.end();
   });
 })
 
 server.listen(3000, () => {
-  console.log('Proxy server listening on port 3000');
+  consola.info('Proxy server listening on port 3000');
 });
