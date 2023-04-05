@@ -27,16 +27,16 @@ if (_.isEmpty(config.local_path_prefix)) {
 }
 
 consola.level = LogLevel[config.log_level] ?? LogLevel.Info
-consola.info("Config is", config);
+consola.info("Config is", config)
 
-const remoteUrl = new URL(config.remote_url);
+const remoteUrl = new URL(config.remote_url)
 if (remoteUrl.protocol != "https:") {
   throw new Error("Only https is supported")
 }
 
 const server = http.createServer((req, res) => {
-  consola.info(`Request received: ${req.method} ${req.url}`);
-  consola.debug(`Request headers: `, req.headers);
+  consola.info(`Request received: ${req.method} ${req.url}`)
+  consola.debug(`Request headers: `, req.headers)
 
   if (config.local_auth_token && !_.includes(req.headers.authorization, config.local_auth_token)) {
     consola.info("Request auth token is invalid")
@@ -71,41 +71,41 @@ const server = http.createServer((req, res) => {
   }
 
   if (config.https_proxy) {
-    opts['agent'] = new HttpsProxyAgent(config.https_proxy);
+    opts['agent'] = new HttpsProxyAgent(config.https_proxy)
   }
 
   const proxyReq = https.request(opts, (proxyRes) => {
-    consola.info(`Proxy response received: ${proxyRes.statusCode} ${proxyRes.statusMessage}`);
+    consola.info(`Proxy response received: ${proxyRes.statusCode} ${proxyRes.statusMessage}`)
     res.writeHead(proxyRes.statusCode || 500, proxyRes.headers)
 
     proxyRes.on('data', (chunk) => {
-      consola.debug(`Received data from proxy: ${chunk}`);
-      res.write(chunk);
-    });
+      consola.debug(`Received data from proxy: ${chunk}`)
+      res.write(chunk)
+    })
 
     proxyRes.on('end', () => {
-      consola.debug('Proxy response ended');
-      res.end();
-    });
+      consola.debug('Proxy response ended')
+      res.end()
+    })
   })
 
   proxyReq.on('error', (err) => {
-    res.statusCode = 500;
-    res.write(err.message);
-    res.end();
-  });
+    res.statusCode = 500
+    res.write(err.message)
+    res.end()
+  })
 
   req.on('data', (chunk) => {
-    consola.debug(`Received data from client: ${chunk}`);
-    proxyReq.write(chunk);
-  });
+    consola.debug(`Received data from client: ${chunk}`)
+    proxyReq.write(chunk)
+  })
 
   req.on('end', () => {
-    consola.debug('Request ended');
-    proxyReq.end();
-  });
+    consola.debug('Request ended')
+    proxyReq.end()
+  })
 })
 
 server.listen(3000, () => {
-  consola.info('Proxy server listening on port 3000');
-});
+  consola.info('Proxy server listening on port 3000')
+})
