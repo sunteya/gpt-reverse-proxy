@@ -89,6 +89,12 @@ const server = http.createServer((req, res) => {
     });
   })
 
+  proxyReq.on('error', (err) => {
+    res.statusCode = 500;
+    res.write(err.message);
+    res.end();
+  });
+
   req.on('data', (chunk) => {
     consola.debug(`Received data from client: ${chunk}`);
     proxyReq.write(chunk);
