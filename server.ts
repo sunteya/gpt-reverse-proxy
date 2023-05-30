@@ -38,6 +38,16 @@ const server = http.createServer((req, res) => {
   consola.info(`Request received: ${req.method} ${req.url}`)
   consola.debug(`Request headers: `, req.headers)
 
+  res.setHeader('Access-Control-Allow-Origin', req.headers["origin"] ?? "*")
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE')
+  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,authorization,content-type')
+
+  if (req.method == "OPTIONS") {
+    res.writeHead(200)
+    res.end()
+    return
+  }
+
   if (config.local_auth_token && !_.includes(req.headers.authorization, config.local_auth_token)) {
     consola.info("Request auth token is invalid")
     res.statusCode = 401
