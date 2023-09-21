@@ -5,6 +5,7 @@ import dotenvFlow from 'dotenv-flow'
 import _ from 'lodash'
 import consola, { LogLevel } from 'consola'
 import { URL } from 'url'
+import { IncomingHttpHeaders } from 'http'
 
 dotenvFlow.config()
 
@@ -34,9 +35,51 @@ if (remoteUrl.protocol != "https:") {
   throw new Error("Only https is supported")
 }
 
+function makeCompatibleOpenCatWithKeya(chunk: Buffer, headers: IncomingHttpHeaders) {
+  if (headers['content-type'] != 'text/event-stream') {
+    return [ chunk ]
+  }
+
+  const lines = chunk.toString().split("\n")
+  const chunk_lines = _.reduce(lines, (result, line) => {
+    if (_.startsWith(line, "data: ")) {
+      result.push([])
+    } else if (result.length == 0) {
+      result.push([])
+    }
+    _.last(result)!.push(line)
+    return result
+  }, <string[][]>[])
+
+  const result = [] as string[]
+  for (const lines of chunk_lines) {
+    const group = lines.join("\n") + "\n"
+
+    if (_.startsWith(group, "data: {")) {
+      const json = JSON.parse(_.replace(group, /^data: /, ""))
+
+      if ('finish_reason' in json) {
+        for (const choice of json.choices) {
+          choice.finish_reason ??= json.finish_reason
+        }
+
+        json.created ??= Math.floor(new Date().getTime() / 1000)
+        json.model ??= ""
+        delete json.finish_reason
+      }
+
+      const new_group = `data: ${JSON.stringify(json)}\n`
+      result.push(new_group + "\n")
+    } else {
+      result.push(group + "\n")
+    }
+  }
+  return result
+}
+
 const server = http.createServer((req, res) => {
   consola.info(`Request received: ${req.method} ${req.url}`)
-  consola.debug(`Request headers: `, req.headers)
+  consola.info(`Request headers: `, req.headers)
 
   res.setHeader('Access-Control-Allow-Origin', req.headers["origin"] ?? "*")
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE')
@@ -86,11 +129,18 @@ const server = http.createServer((req, res) => {
 
   const proxyReq = https.request(opts, (proxyRes) => {
     consola.info(`Proxy response received: ${proxyRes.statusCode} ${proxyRes.statusMessage}`)
+    consola.info(`Proxy response headers: `, proxyRes.headers)
     res.writeHead(proxyRes.statusCode || 500, proxyRes.headers)
 
-    proxyRes.on('data', (chunk) => {
-      consola.debug(`Received data from proxy: ${chunk}`)
-      res.write(chunk)
+    proxyRes.on('data', (raw) => {
+      consola.debug(`Received data from proxy: ${raw}`)
+
+
+      const chunks = makeCompatibleOpenCatWithKeya(raw, proxyRes.headers)
+      for (const chunk of chunks) {
+        consola.debug("write chunk", chunk)
+        res.write(chunk)
+      }
     })
 
     proxyRes.on('end', () => {
