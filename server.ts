@@ -31,9 +31,6 @@ consola.level = LogLevel[config.log_level] ?? LogLevel.Info
 consola.info("Config is", config)
 
 const remoteUrl = new URL(config.remote_url)
-if (remoteUrl.protocol != "https:") {
-  throw new Error("Only https is supported")
-}
 
 function makeCompatibleOpenCatWithKeya(chunk: Buffer, headers: IncomingHttpHeaders) {
   if (headers['content-type'] != 'text/event-stream') {
@@ -111,7 +108,7 @@ const server = http.createServer((req, res) => {
 
   const opts = {
     hostname: remoteUrl.hostname,
-    port: parseInt(remoteUrl.port) || 443,
+    port: parseInt(remoteUrl.port) || (remoteUrl.protocol == "https:" ? 443 : 80),
     path: path,
     method: req.method,
     headers: req.headers
@@ -127,7 +124,8 @@ const server = http.createServer((req, res) => {
     opts['agent'] = new HttpsProxyAgent(config.https_proxy)
   }
 
-  const proxyReq = https.request(opts, (proxyRes) => {
+  const protocol = (remoteUrl.protocol == "https:") ? https : http
+  const proxyReq = protocol.request(opts, (proxyRes) => {
     consola.info(`Proxy response received: ${proxyRes.statusCode} ${proxyRes.statusMessage}`)
     consola.info(`Proxy response headers: `, proxyRes.headers)
     res.writeHead(proxyRes.statusCode || 500, proxyRes.headers)
