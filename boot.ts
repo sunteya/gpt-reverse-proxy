@@ -14,8 +14,10 @@ const config = {
 
 for (const key in config) {
   const value = process.env[key] ?? process.env[key.toUpperCase()]
-  if (value === '' && config[key] == null) {
-    config[key] = value
+  if (value === '') {
+    if (config[key] == null) {
+      config[key] = value
+    }
   } else if (value !== undefined) {
     config[key] = value
   }

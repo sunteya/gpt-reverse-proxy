@@ -4,6 +4,7 @@ import _ from 'lodash'
 import consola, { LogLevel } from 'consola'
 import { logger } from './lib/logger'
 import { proxy } from './lib/proxy'
+import { registerOpenAIRoutes } from './lib/route-openai'
 
 import env from './boot'
 
@@ -17,31 +18,7 @@ const upstream = proxy({
 })
 
 const routes = new Hono()
-routes.post('/v1/chat/completions', async (c) => {
-  const response = await upstream(c, async () => {})
-
-  if (!response) {
-    return c.text('Proxy middleware failed to return a response.', 500)
-  }
-
-  if (!response.body) {
-    return response
-  }
-
-  const { readable, writable } = new TransformStream({
-    transform(chunk, controller) {
-      const modifiedChunk = Buffer.from(chunk)
-        .toString('utf-8')
-        .replace(/,"finish_reason":null/g, '')
-        .replace(/,"usage":null/g, '')
-      controller.enqueue(new TextEncoder().encode(modifiedChunk))
-    },
-  })
-
-  response.body.pipeTo(writable)
-  return new Response(readable, response)
-})
-
+registerOpenAIRoutes(routes, upstream)
 routes.all('*', (c, next) => upstream(c, next))
 
 const app = new Hono<{
