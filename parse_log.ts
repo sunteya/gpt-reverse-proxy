@@ -1,8 +1,8 @@
 import fs from 'fs';
+import { URL } from 'url';
 
 function parseLogFile(filePath: string) {
   const fileContent = fs.readFileSync(filePath, 'utf-8');
-  // Normalize line endings to handle Windows (CRLF), Mac (CR), and Linux (LF)
   const lines = fileContent.replace(/\r\n/g, '\n').replace(/\n/g, '\n').split('\n');
 
   const request = {
@@ -38,11 +38,11 @@ function parseLogFile(filePath: string) {
     } else if (line.startsWith('==== REQUEST CHUNK -')) {
       currentSection = 'request-chunk';
       continue;
-    } else if (line.startsWith('==== CHUNK -')) {
+    } else if (line.startsWith('==== RESPONSE CHUNK -') || line.startsWith('==== CHUNK -')) {
       currentSection = 'response-chunk';
       continue;
-    } else if (line.startsWith('==== REQUEST BODY COMPLETE') || line.startsWith('data: [DONE]')) {
-      currentSection = ''; // Stop capturing content after this
+    } else if (line.startsWith('==== REQUEST BODY COMPLETE') || line.startsWith('==== RESPONSE BODY COMPLETE')) {
+      currentSection = ''; 
       continue;
     }
 
@@ -53,20 +53,37 @@ function parseLogFile(filePath: string) {
         }
         if (currentSection === 'request') {
             if (!request.method) {
-                const [method, reqPath, httpVersion] = line.split(' ');
-                request.method = method;
-                request.path = reqPath;
-                request.httpVersion = httpVersion;
+                const parts = line.split(' ');
+                if (parts.length >= 3 && parts[2].startsWith('HTTP')) {
+                    request.method = parts[0];
+                    request.path = parts[1];
+                    request.httpVersion = parts[2];
+                } else {
+                    request.method = parts[0];
+                    try {
+                        const url = new URL(parts.slice(1).join(' '));
+                        request.path = url.pathname + url.search;
+                    } catch (e) {
+                        request.path = parts.slice(1).join(' ');
+                    }
+                    request.httpVersion = 'HTTP/unknown';
+                }
             } else {
                 const [key, ...valueParts] = line.split(': ');
                 if (key && valueParts.length > 0) request.headers[key.trim()] = valueParts.join(': ').trim();
             }
         } else if (currentSection === 'response') {
             if (!response.statusCode) {
-                const parts = line.split(' ');
-                response.httpVersion = parts[0];
-                response.statusCode = parts[1];
-                response.statusMessage = parts.slice(2).join(' ');
+                if (line.startsWith('Status:')) {
+                    response.statusCode = line.split(': ')[1].trim();
+                    response.httpVersion = 'HTTP/unknown';
+                    response.statusMessage = '';
+                } else {
+                    const parts = line.split(' ');
+                    response.httpVersion = parts[0];
+                    response.statusCode = parts[1];
+                    response.statusMessage = parts.slice(2).join(' ');
+                }
             } else {
                 const [key, ...valueParts] = line.split(': ');
                 if (key && valueParts.length > 0) response.headers[key.trim()] = valueParts.join(': ').trim();
@@ -79,7 +96,6 @@ function parseLogFile(filePath: string) {
     }
   }
 
-  // Process request body
   if(requestBodyChunks.length > 0) {
     const rawBody = requestBodyChunks.join('');
     try {
@@ -90,11 +106,10 @@ function parseLogFile(filePath: string) {
     }
   }
 
-  // Process response body from SSE chunks or as a single JSON object
   let responseContent = '';
-  const rawResponseBody = responseBodyChunks.join('').trim();
+  const rawResponseBody = responseBodyChunks.join('\n').trim();
 
-  if (rawResponseBody.startsWith('data:')) { // Heuristic for SSE
+  if (rawResponseBody.includes('data:')) { 
     responseContent = responseBodyChunks
       .join('\n')
       .split('\n')
@@ -106,21 +121,20 @@ function parseLogFile(filePath: string) {
             const parsed = JSON.parse(jsonStr);
             return parsed.choices[0].delta.content || '';
         } catch (e) {
-            return ''; // Ignore malformed JSON parts
+            return ''; 
         }
     }).join('');
-  } else { // Assume it's a complete (or fragmented) JSON body
+  } else { 
     try {
       const parsedJson = JSON.parse(rawResponseBody);
       responseContent = JSON.stringify(parsedJson, null, 2);
     } catch (e) {
-      responseContent = rawResponseBody; // Not a JSON body, use raw
+      responseContent = rawResponseBody; 
     }
   }
 
   response.body = responseContent;
 
-  // --- Output ---
   console.log('--- REQUEST ---');
   console.log(`${request.method} ${request.path} ${request.httpVersion}`);
   for (const [key, value] of Object.entries(request.headers)) {
