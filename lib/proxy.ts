@@ -49,6 +49,8 @@ export function createProxy(config: ProxyConfig) {
     },
 
     ...(config.https_proxy && { agent: new HttpsProxyAgent(config.https_proxy) }),
+
+    selfHandleResponse: true,
     
     on: {
       proxyReq: (proxyReq: http.ClientRequest, req: http.IncomingMessage) => {
@@ -57,10 +59,32 @@ export function createProxy(config: ProxyConfig) {
         }
       },
       
-      proxyRes: (proxyRes: http.IncomingMessage, req: http.IncomingMessage) => {
+      proxyRes: (proxyRes: http.IncomingMessage, req: http.IncomingMessage, res: http.ServerResponse) => {
         if (req.httpVersion !== proxyRes.httpVersion) {
           consola.info(`Protocol conversion: Client HTTP/${req.httpVersion} ↔ Upstream HTTP/${proxyRes.httpVersion}`)
         }
+
+        // Copy original headers and status code
+        res.statusCode = proxyRes.statusCode!;
+        Object.keys(proxyRes.headers).forEach((key) => {
+          res.setHeader(key, proxyRes.headers[key]!);
+        });
+        
+        proxyRes.on('data', (chunk: Buffer) => {
+          const modifiedChunk = chunk.toString('utf-8')
+            .replace(/,"finish_reason":null/g, '')
+            .replace(/,"usage":null/g, '');
+          res.write(modifiedChunk);
+        });
+
+        proxyRes.on('end', () => {
+          res.end();
+        });
+
+        proxyRes.on('error', (err: Error) => {
+          consola.error('Proxy response error', err);
+          res.end();
+        });
       }
     }
   } satisfies Options<http.IncomingMessage, http.ServerResponse>
