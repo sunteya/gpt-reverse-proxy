@@ -1,44 +1,24 @@
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
-import dotenvFlow from 'dotenv-flow'
 import _ from 'lodash'
 import consola, { LogLevel } from 'consola'
-import { logger } from './lib/hono-logger.js'
-import { proxy } from './lib/hono-proxy.js'
+import { logger } from './lib/logger'
+import { proxy } from './lib/proxy'
 
-dotenvFlow.config()
+import env from './boot'
 
-const config = {
-  remote_url: null! as string,
-  remote_authorization: null as string | null,
-  local_path_prefix: "/" as string,
-  https_proxy: null as string | null,
-  log_level: "info" as string
-}
+consola.level = LogLevel[_.capitalize(env.log_level)]
+consola.info("env is", env)
 
-for (const key in config) {
-  // @ts-ignore
-  config[key] = process.env[key] ?? process.env[key.toUpperCase()] ?? config[key]
-}
-
-const logLevelKey = _.capitalize(config.log_level) as keyof typeof LogLevel
-consola.level = LogLevel[logLevelKey] ?? LogLevel.Info
-
-consola.info("Config is", config)
-
-const proxyConfig = {
-  remote_url: config.remote_url,
-  remote_authorization: config.remote_authorization,
-  https_proxy: config.https_proxy,
-}
-
-const app = new Hono()
-app.use('*', logger())
+const upstream = proxy({
+  upstream_url: env.upstream_url,
+  upstream_authorization: env.upstream_authorization,
+  https_proxy: env.https_proxy,
+})
 
 const routes = new Hono()
-
 routes.post('/v1/chat/completions', async (c) => {
-  const response = await proxy(proxyConfig)(c, async () => {})
+  const response = await upstream(c, async () => {})
 
   if (!response) {
     return c.text('Proxy middleware failed to return a response.', 500)
@@ -62,18 +42,27 @@ routes.post('/v1/chat/completions', async (c) => {
   return new Response(readable, response)
 })
 
-routes.all('*', (c, next) => proxy(proxyConfig)(c, next))
+routes.all('*', (c, next) => upstream(c, next))
 
-const prefix = config.local_path_prefix
-if (prefix && prefix !== '/') {
+const app = new Hono<{
+  Variables: {
+    path_prefix: string
+  }
+}>()
+app.use('*', logger())
+
+const prefix = (env.local_path_prefix ?? '').replace(/\/+$/, '')
+if (prefix) {
+  app.use(`${prefix}/*`, (c, next) => {
+    c.set('path_prefix', prefix)
+    return next()
+  })
+
   app.route(prefix, routes)
 } else {
   app.route('/', routes)
 }
 
-serve({
-  fetch: app.fetch,
-  port: 12000
-}, (info) => {
+serve({ fetch: app.fetch, port: 12000 }, (info) => {
   consola.info(`Server listening on port ${info.port}`)
 })

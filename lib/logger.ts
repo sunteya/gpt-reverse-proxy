@@ -2,7 +2,7 @@ import { MiddlewareHandler } from 'hono'
 import fs from 'fs'
 import path from 'path'
 import dayjs from 'dayjs'
-import consola from 'consola'
+import consola, { LogLevel } from 'consola'
 
 function generateLogFilePath(requestPath: string): string {
   let cleanPath = requestPath.split('?')[0].replace(/[<>:"|*?]/g, '_')
@@ -44,6 +44,10 @@ function logResponseChunk(logFile: string, chunkIndex: number, chunk: Buffer) {
 
 export const logger = (): MiddlewareHandler => {
   return async (c, next) => {
+    if (consola.level < LogLevel.Debug) {
+      return next()
+    }
+
     const logFile = generateLogFilePath(c.req.path)
     consola.info(`Request start logged to: ${logFile}`)
 

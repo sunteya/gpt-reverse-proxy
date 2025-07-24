@@ -2,6 +2,12 @@
 
 A reverse proxy for ChatGPT API.
 
+## Features
+
+- Ensures compatibility with API calls from Cursor.
+- Customize URL path prefixes.
+- Secure the service with a custom authentication key.
+
 ## Usage
 
 **The following configuration integrates Traefik, you need to modify it according to your own environment.**
@@ -17,14 +23,19 @@ git clone https://github.com/sunteya/gpt-reverse-proxy
 version: "3"
 services:
   app:
-    build:
-      context: ./gpt-reverse-proxy/
+    image: guergeiro/pnpm:20-10
+    volumes:
+      - ./app:/app
+      - ./root:/root/
+    working_dir: /app
+    command: "pnpm tsx server.ts"
     environment:
+      UPSTREAM_URL: https://api.openai.com
+      UPSTREAM_AUTHORIZATION: Bearer sk-you-api-token
       LOCAL_PATH_PREFIX: /chatgpt
       LOCAL_AUTH_TOKEN: any_token_you_wish
-      REMOTE_AUTHORIZATION: Bearer sk-you-api-token
       # https_proxy: http://192.168.2.3:7890
-      # LOG_LEVEL: Info
+      # LOG_LEVEL: debug
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.chatgpt.rule=HostRegexp(`{catch_all:.*}`) && PathPrefix(`/chatgpt`)"

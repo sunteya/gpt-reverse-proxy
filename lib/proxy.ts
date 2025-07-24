@@ -1,18 +1,22 @@
 import { MiddlewareHandler } from 'hono'
 import { ProxyAgent } from 'undici'
+import { stripPrefix } from './utils'
 
 export interface ProxyConfig {
-  remote_url: string
-  remote_authorization?: string | null
+  upstream_url: string
+  upstream_authorization?: string | null
   https_proxy?: string | null
 }
 
 export const proxy = (config: ProxyConfig): MiddlewareHandler => {
   return async (c, next) => {
-    const remoteUrl = new URL(config.remote_url)
+    const remoteUrl = new URL(config.upstream_url)
     const requestUrl = new URL(c.req.url)
 
-    const targetUrl = new URL(requestUrl.pathname + requestUrl.search, remoteUrl.origin)
+    const prefix = c.get('path_prefix') as string | undefined | null
+    const strippedPath = stripPrefix(requestUrl.pathname, prefix)
+
+    const targetUrl = new URL(strippedPath + requestUrl.search, remoteUrl.origin)
 
     if (remoteUrl.pathname && remoteUrl.pathname !== '/') {
       const remotePath = remoteUrl.pathname.replace(/\/$/, '')
@@ -22,12 +26,11 @@ export const proxy = (config: ProxyConfig): MiddlewareHandler => {
 
     const headers = new Headers(c.req.header())
     headers.delete('host')
-    if (config.remote_authorization) {
-      headers.set('authorization', config.remote_authorization)
+    if (config.upstream_authorization) {
+      headers.set('authorization', config.upstream_authorization)
     }
 
     const agent = config.https_proxy ? new ProxyAgent(config.https_proxy) : undefined
-    // @ts-ignore
     const dispatcher = agent ? { dispatcher: agent } : {}
 
     const response = await fetch(targetUrl.toString(), {
