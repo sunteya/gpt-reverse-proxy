@@ -1,6 +1,5 @@
 import { MiddlewareHandler } from 'hono'
 import { ProxyAgent } from 'undici'
-import { stripPrefix } from './utils'
 
 export interface ProxyConfig {
   upstream_url: string
@@ -13,10 +12,10 @@ export const proxy = (config: ProxyConfig): MiddlewareHandler => {
     const remoteUrl = new URL(config.upstream_url)
     const requestUrl = new URL(c.req.url)
 
-    const prefix = c.get('path_prefix') as string | undefined | null
-    const strippedPath = stripPrefix(requestUrl.pathname, prefix)
+    const rewritePath = c.get('rewrite_path') as string | undefined
+    const path = rewritePath ?? requestUrl.pathname
 
-    const targetUrl = new URL(strippedPath + requestUrl.search, remoteUrl.origin)
+    const targetUrl = new URL(path + requestUrl.search, remoteUrl.origin)
 
     if (remoteUrl.pathname && remoteUrl.pathname !== '/') {
       const remotePath = remoteUrl.pathname.replace(/\/$/, '')

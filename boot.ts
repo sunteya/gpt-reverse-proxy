@@ -10,6 +10,7 @@ const config = {
 
   local_path_prefix: null as string | null,
   local_auth_token: null as string | null,
+  local_ollama_secret: 'ollama' as string | null,
 }
 
 for (const key in config) {

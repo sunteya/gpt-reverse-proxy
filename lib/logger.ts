@@ -44,6 +44,8 @@ function logResponseChunk(logFile: string, chunkIndex: number, chunk: Buffer) {
 
 export const logger = (): MiddlewareHandler => {
   return async (c, next) => {
+    consola.info(`${c.req.method} ${c.req.url}`)
+
     if (consola.level < LogLevel.Debug) {
       return next()
     }

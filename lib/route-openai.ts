@@ -1,4 +1,5 @@
-import type { Context, MiddlewareHandler, Hono } from 'hono'
+import { Hono, type Context, type MiddlewareHandler } from 'hono'
+import { auth } from './auth'
 
 export function handleChatCompletions(upstream: MiddlewareHandler) {
   return async (c: Context) => {
@@ -27,6 +28,14 @@ export function handleChatCompletions(upstream: MiddlewareHandler) {
   }
 }
 
-export function registerOpenAIRoutes(routes: Hono, upstream: MiddlewareHandler) {
+export function registerOpenAIRoutes(root: Hono, upstream: MiddlewareHandler, authToken: string | null) {
+  const routes = new Hono()
+  if (authToken) {
+    routes.use('*', auth(authToken))
+  }
+
   routes.post('/v1/chat/completions', handleChatCompletions(upstream))
+  routes.all('*', (c, next) => upstream(c, next))
+
+  root.route('/', routes)
 }
