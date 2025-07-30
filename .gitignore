@@ -3,3 +3,5 @@
 /.specstory/
 /log/
 /.cursorindexingignore
+__pycache__
+/litellm_config.yaml

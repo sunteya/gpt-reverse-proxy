@@ -1,0 +1,6 @@
+model_list:
+  - model_name: "*"
+    litellm_params:
+      model: openai/*
+      api_key: sk-you-keys
+      api_base: https://your-host/v1
