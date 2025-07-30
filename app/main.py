@@ -9,6 +9,7 @@ from app.config import settings
 from litellm.proxy import proxy_server
 from app.routers.litellm import setup_litellm_routes
 from app.routers.ollama import setup_ollama_routes
+from app.logging import FullLoggingMiddleware
 
 async def main():
     print("─" * 50)
@@ -21,6 +22,7 @@ async def main():
     await setup_litellm_routes(settings)
     app = proxy_server.app
     setup_ollama_routes(app, settings)
+    app.add_middleware(FullLoggingMiddleware, settings=settings)
 
     # Run Uvicorn programmatically to allow for async setup before starting.
     server_config = uvicorn.Config(

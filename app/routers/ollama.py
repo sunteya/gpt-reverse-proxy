@@ -54,7 +54,7 @@ class OllamaProxyMiddleware(BaseHTTPMiddleware):
 
         if original_path == self.prefixed_tags_path:
             return await self.handle_tags_request(request, call_next)
-        elif [self.prefixed_show_path].count(original_path) > 0:
+        elif original_path in [self.prefixed_show_path]:
             return await call_next(request)
         elif original_path.startswith(self.prefix):
             return await self.proxy_request(request, call_next)

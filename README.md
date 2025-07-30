@@ -9,6 +9,9 @@ A reverse proxy for ChatGPT API.
 - Secure the service with a custom authentication key.
 - Ollama API compatibility for GitHub Copilot (emulates `/api/tags` and `/api/show` endpoints).
 
+> [!NOTE]
+> The `LOCAL_PATH_PREFIX` feature is currently not supported in the new Python version.
+
 ## Usage
 
 **The following configuration integrates Traefik, you need to modify it according to your own environment.**
@@ -18,52 +21,61 @@ A reverse proxy for ChatGPT API.
 git clone https://github.com/sunteya/gpt-reverse-proxy app
 ```
 
-2\. Edit `docker-compose.yml` file
+2\. Create `litellm_config.yaml` file
+
+Create a `litellm_config.yaml` file in your project root and configure your upstream provider. For more details, see the [LiteLLM documentation](https://docs.litellm.ai/docs/proxy/config).
 
 ```yaml
-version: "3"
+model_list:
+  - model_name: "*"
+    litellm_params:
+      model: openai/*
+      api_key: sk-you-api-keys
+      api_base: https://your-host/v1
+```
+
+3\. Edit `docker-compose.yml` file
+
+```yaml
 services:
   app:
-    image: guergeiro/pnpm:20-10
+    image: ghcr.io/astral-sh/uv:0.8.3-python3.13-alpine
     volumes:
       - ./app:/app
-      - ./root:/root/
+      - ./litellm_config.yaml:/app/litellm_config.yaml
     working_dir: /app
-    command: "pnpm tsx server.ts"
+    command: "uv run -m app.main"
     environment:
-      UPSTREAM_URL: https://api.openai.com
-      UPSTREAM_AUTHORIZATION: Bearer sk-you-api-token
-      # https_proxy: http://192.168.2.3:7890
-
       LOCAL_AUTH_TOKEN: any_token_you_wish
       LOCAL_OLLAMA_SECRET: /your-secret-ollama-path
-      # LOCAL_PATH_PREFIX: /your-path-prefix
-      # LOG_LEVEL: debug
+
+      # DUMP_HTTP_CONTENT: true
+      # LOCAL_PATH_PREFIX: /prefix
+      # https_proxy: http://192.168.2.3:7890
     # ports:
     #   - 12000:12000
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.chatgpt.rule=HostRegexp(`{catch_all:.*}`) && PathPrefix(`/chatgpt`)"
+      - "traefik.http.routers.chatgpt.rule=HostRegexp(`gpt-reverse-proxy.example.com`)
       - "traefik.http.routers.chatgpt.tls.options=default"
       - "traefik.http.services.chatgpt.loadbalancer.server.port=12000"
 ```
 
-3\. Run `docker compose up -d`
+4\. Run `docker compose up -d`
 
 <hr>
 
 ### Request Examples
 
 #### Proxy for OpenAI API
-This section demonstrates how to proxy requests to the OpenAI API. The proxy supports adding a custom path prefix (`LOCAL_PATH_PREFIX`) and requires authentication via a bearer token (`LOCAL_AUTH_TOKEN`).
+This section demonstrates how to proxy requests to the OpenAI API. The proxy requires authentication via a bearer token (`LOCAL_AUTH_TOKEN`).
 
 ```bash
 # Example with
-# LOCAL_PATH_PREFIX=/your-path-prefix
 # LOCAL_AUTH_TOKEN=any_token_you_wish
 
 # Incoming request from the user
-curl -X POST -H "Authorization: Bearer any_token_you_wish" https://you.host/your-path-prefix/v1/chat/completions
+curl -X POST -H "Authorization: Bearer any_token_you_wish" https://you.host/v1/chat/completions
 
 # The proxy forwards this as the following upstream request:
 curl -X POST -H "Authorization: Bearer sk-you-api-token" https://api.openai.com/v1/chat/completions
@@ -74,11 +86,10 @@ This proxy can also emulate certain Ollama endpoints to provide compatibility wi
 
 ```bash
 # Example with
-# LOCAL_PATH_PREFIX=/your-path-prefix
-# LOCAL_OLLAMA_SECRET=/your-secret-ollama-path
+# LOCAL_OLLAMA_SECRET=your-secret-ollama-path
 
 # Incoming request from the user
-curl https://you.host/your-path-prefix/your-secret-ollama-path/api/tags
+curl https://you.host/your-secret-ollama-path/api/tags
 
 # The proxy intercepts this, converts it to a request to fetch models from the upstream, and formats the response to be Ollama-compatible:
 curl -X GET -H "Authorization: Bearer sk-you-api-token" https://api.openai.com/v1/models

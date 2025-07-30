@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     litellm_config_path: str = "litellm_config.yaml"
+    dump_http_content: bool = True
 
     local_ollama_secret: str = "ollama"
     local_auth_token: Optional[str] = None
