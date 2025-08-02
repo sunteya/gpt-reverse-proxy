@@ -16,7 +16,7 @@ class OpenAIClient:
         if not self.api_base:
             print("`api_base` not found in litellm_params. Cannot fetch models.")
             return []
-            
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(f"{self.api_base}/models", headers=self._headers)

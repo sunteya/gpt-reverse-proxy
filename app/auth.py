@@ -27,12 +27,8 @@ class CustomAuth:
             key_to_check = api_key[7:]
         else:
             key_to_check = api_key
-
+        
         if key_to_check == self.settings.local_auth_token:
-            return UserAPIKeyAuth(api_key=key_to_check, user_role="proxy_admin")
+            return UserAPIKeyAuth(api_key=key_to_check)
         else:
-            raise ProxyException(
-                message="Invalid API Key",
-                type="authentication_error",
-                code=401,
-            )
+            raise ProxyException(message="Invalid API Key", type="authentication_error", code=401, param="api_key")

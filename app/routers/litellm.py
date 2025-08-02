@@ -5,12 +5,14 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Callable, Awaitable
-from starlette.responses import Response
-from litellm.proxy import proxy_server
+from starlette.responses import Response, StreamingResponse
 from litellm import litellm
+from litellm.proxy import proxy_server
 from app.models.openai_client import OpenAIClient
 from app.config import Settings
 from app.auth import CustomAuth
+from .. import utils
+from ..openai2claudecode_llm import OpenAI2ClaudeCodeLLM
 
 
 class EnrichModelsMiddleware(BaseHTTPMiddleware):
@@ -25,10 +27,8 @@ class EnrichModelsMiddleware(BaseHTTPMiddleware):
         if request.url.path not in ["/v1/models", "/models"]:
             return response
 
-        response_body = b""
-        async for chunk in response.body_iterator:
-            response_body += chunk
-        
+        response_body = await utils.read_response_body(response)
+
         try:
             data = json.loads(response_body.decode('utf-8'))
             original_models = data.get("data", [])
@@ -65,8 +65,10 @@ class EnrichModelsMiddleware(BaseHTTPMiddleware):
 async def setup_litellm_routes(settings: Settings):
     config_path = settings.litellm_config_path
     try:
+
         proxy_server.user_custom_auth = CustomAuth(settings=settings)
-        await proxy_server.initialize(config=config_path, debug=True)
+        await proxy_server.initialize(config=config_path)
+
         proxy_server.app.add_middleware(EnrichModelsMiddleware, router=proxy_server.llm_router)
         print(f"LiteLLM Proxy server configured with '{config_path}' and middleware.")
 

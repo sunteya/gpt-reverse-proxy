@@ -6,6 +6,7 @@ from starlette.responses import Response
 from typing import Awaitable, Callable
 
 from app.config import Settings
+from .. import utils
 
 
 class OllamaProxyMiddleware(BaseHTTPMiddleware):
@@ -20,12 +21,10 @@ class OllamaProxyMiddleware(BaseHTTPMiddleware):
         """Rewrites path to /v1/models, gets response from litellm, and reformats it for Ollama."""
         request.scope['path'] = '/v1/models'
         request.scope['raw_path'] = b'/v1/models'
-        
-        response = await call_next(request)
 
-        response_body = b""
-        async for chunk in response.body_iterator:
-            response_body += chunk
+        response = await call_next(request)
+        response_body = await utils.read_response_body(response)
+
         try:
             data = json.loads(response_body.decode('utf-8'))
             models = [{"name": m.get("id"), "model": m.get("id")} for m in data.get("data", [])]
