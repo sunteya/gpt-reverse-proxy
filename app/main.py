@@ -18,13 +18,11 @@ async def main():
         print(f"  {key}: {value}")
     print("─" * 50)
 
-    # Setup middleware and routes
     await setup_litellm_routes(settings)
     app = proxy_server.app
     setup_ollama_routes(app, settings)
     app.add_middleware(FullLoggingMiddleware, settings=settings)
 
-    # Run Uvicorn programmatically to allow for async setup before starting.
     server_config = uvicorn.Config(
         app, host="0.0.0.0", port=12000
     )

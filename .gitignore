@@ -5,3 +5,6 @@
 /.cursorindexingignore
 __pycache__
 /litellm_config.yaml
+/debug/
+/.vscode/
+/.claude/

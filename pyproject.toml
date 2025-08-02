@@ -3,16 +3,5 @@ name = "gpt-reverse-proxy"
 version = "0"
 requires-python = ">=3.13"
 dependencies = [
-    "apscheduler>=3.11.0",
-    "backoff>=2.2.1",
-    "cryptography>=45.0.5",
-    "fastapi>=0.116.1",
-    "litellm>=1.74.9.post1",
-    "orjson>=3.11.1",
-    "pydantic-settings>=2.10.1",
-    "pydantic[email]>=2.11.7",
-    "python-multipart>=0.0.20",
-    "uvicorn>=0.35.0",
-    "fastapi-sso>=0.18.0",
-    "websockets>=15.0.1",
+    "litellm[proxy]>=1.74.9.post1",
 ]

@@ -34,12 +34,34 @@ model_list:
       api_base: https://your-host/v1
 ```
 
+**For Claude Code integration**, you can add a specific mapping to route Claude models through the proxy:
+
+```yaml
+model_list:
+  - model_name: "claude-sonnet-4-20250514"
+    litellm_params:
+      model: "openai2claudecode/claude-sonnet-4-20250514"
+      api_base: https://your-host
+      api_key: sk-you-keys
+
+  - model_name: "*"
+    litellm_params:
+      model: openai/*
+      api_key: sk-you-keys
+      api_base: https://your-host/v1
+
+litellm_settings:
+  custom_provider_map:
+    - provider: "openai2claudecode"
+      custom_handler: "app.openai2claudecode_llm.instance"
+```
+
 3\. Edit `docker-compose.yml` file
 
 ```yaml
 services:
   app:
-    image: ghcr.io/astral-sh/uv:0.8.3-python3.13-alpine
+    image: ghcr.io/astral-sh/uv:0.8.3-python3.13-bookworm
     volumes:
       - ./app:/app
       - ./litellm_config.yaml:/app/litellm_config.yaml
