@@ -1,9 +1,10 @@
-from typing import Callable, AsyncIterator
+from typing import Callable, AsyncIterator, List, Dict, Any
 import httpx
 
 import litellm
+from litellm import LiteLLMParamsTypedDict
 from litellm.types.utils import GenericStreamingChunk, ModelResponse
-from litellm.exceptions import APIConnectionError, ServiceUnavailableError
+from litellm.exceptions import APIConnectionError, ServiceUnavailableError, InternalServerError
 from litellm.llms.custom_llm import CustomLLM
 from litellm.litellm_core_utils.litellm_logging import Logging
 from litellm._logging import verbose_logger, verbose_proxy_logger
@@ -36,7 +37,8 @@ class OpenAI2ClaudeCodeLLM(CustomLLM):
         litellm_params = litellm_params or {}
         model_info = litellm_params.get('model_info') or {}
         sponsor = model_info.get('sponsor', 'default')
-        verbose_proxy_logger.info(f"Proxying request for {model} ({sponsor}) to claude-code")
+        display_name = f"{model} ({sponsor})"
+        verbose_proxy_logger.info(f"Proxying request for {display_name} to claude-code")
 
         try:
             response = await litellm.acompletion(
@@ -49,12 +51,32 @@ class OpenAI2ClaudeCodeLLM(CustomLLM):
                 **self.build_params(optional_params)
             )
             return response
-        except APIConnectionError as e:
-            verbose_proxy_logger.error(f"APIConnectionError for {model}: {e}")
+        except Exception as e:
+            # Log detailed exception information for debugging
+            exception_type = type(e).__name__
+            exception_module = type(e).__module__
+            exception_str = str(e)
+
+            verbose_proxy_logger.error(f"Exception caught in acompletion for {display_name}:")
+            verbose_proxy_logger.error(f"  Type: {exception_module}.{exception_type}")
+            verbose_proxy_logger.error(f"  Message: {exception_str}")
+            verbose_proxy_logger.error(f"  Exception object: {repr(e)}")
+
+            # Try to extract original error details
+            if hasattr(e, '__cause__') and e.__cause__:
+                cause_type = type(e.__cause__).__name__
+                cause_module = type(e.__cause__).__module__
+                verbose_proxy_logger.error(f"  Cause: {cause_module}.{cause_type} - {e.__cause__}")
+
+            # Check for response attribute
+            if hasattr(e, 'response'):
+                verbose_proxy_logger.error(f"  Has response attribute: {getattr(e, 'response', None)}")
+
+            # For now, raise ServiceUnavailableError for all exceptions
             raise ServiceUnavailableError(
-                f"Service temporarily unavailable: {str(e)}",
+                f"Service temporarily unavailable: {exception_str}",
                 llm_provider=self.provider_name,
-                model=model
+                model=display_name
             )
 
     async def astreaming(self, # type: ignore[reportIncompatibleMethodOverride]
@@ -78,7 +100,8 @@ class OpenAI2ClaudeCodeLLM(CustomLLM):
         litellm_params = litellm_params or {}
         model_info = litellm_params.get('model_info') or {}
         sponsor = model_info.get('sponsor', 'anonymous')
-        verbose_proxy_logger.info(f"Proxying stream request for {model} ({sponsor}) to claude-code")
+        display_name = f"{model} ({sponsor})"
+        verbose_proxy_logger.info(f"Proxying stream request for {display_name} to claude-code")
 
         try:
             response = await litellm.acompletion(
@@ -90,12 +113,32 @@ class OpenAI2ClaudeCodeLLM(CustomLLM):
                 timeout=self.build_timeout(timeout),
                 **self.build_params(optional_params)
             )
-        except APIConnectionError as e:
-            verbose_proxy_logger.error(f"APIConnectionError for {model}: {e}")
+        except Exception as e:
+            # Log detailed exception information for debugging
+            exception_type = type(e).__name__
+            exception_module = type(e).__module__
+            exception_str = str(e)
+
+            verbose_proxy_logger.error(f"Exception caught in acompletion for {display_name}:")
+            verbose_proxy_logger.error(f"  Type: {exception_module}.{exception_type}")
+            verbose_proxy_logger.error(f"  Message: {exception_str}")
+            verbose_proxy_logger.error(f"  Exception object: {repr(e)}")
+
+            # Try to extract original error details
+            if hasattr(e, '__cause__') and e.__cause__:
+                cause_type = type(e.__cause__).__name__
+                cause_module = type(e.__cause__).__module__
+                verbose_proxy_logger.error(f"  Cause: {cause_module}.{cause_type} - {e.__cause__}")
+
+            # Check for response attribute
+            if hasattr(e, 'response'):
+                verbose_proxy_logger.error(f"  Has response attribute: {getattr(e, 'response', None)}")
+
+            # For now, raise ServiceUnavailableError for all exceptions
             raise ServiceUnavailableError(
-                f"Service temporarily unavailable: {str(e)}",
+                f"Service temporarily unavailable: {exception_str}",
                 llm_provider=self.provider_name,
-                model=model
+                model=display_name
             )
 
         if isinstance(response, ModelResponse):
@@ -106,6 +149,35 @@ class OpenAI2ClaudeCodeLLM(CustomLLM):
                 yield chunk
 
 
+    async def get_models(self, litellm_params: litellm.LiteLLMParamsTypedDict | dict) -> List[Dict[str, Any]]:
+        litellm_params = litellm_params or {}
+        api_base = litellm_params.get("api_base")
+        api_key = litellm_params.get("api_key")
+
+        if not api_base:
+            verbose_proxy_logger.warning("api_base not found in litellm_params for openai2claudecode. Cannot fetch models.")
+            return []
+
+        headers = self.build_extra_headers({
+            "Authorization": f"Bearer {api_key}",
+            "x-api-key": api_key,
+        }, litellm_params)
+
+        try:
+            async with httpx.AsyncClient() as client:
+                print(f"Fetching models from openai2claudecode at {api_base}/v1/models")
+                print(f"Using headers: {headers}")
+                response = await client.get(f"{api_base}/v1/models", headers=headers)
+                print(f"Response status code: {response.status_code}")
+                print(f"Response: {response.text}")
+
+                response.raise_for_status()
+                models_data = response.json()
+                return models_data.get("data", [])
+        except Exception as e:
+            verbose_proxy_logger.error(f"Failed to fetch models from openai2claudecode '{api_base}': {e}")
+            return []
+
     def build_timeout(self, timeout: float | httpx.Timeout | None):
         if isinstance(timeout, httpx.Timeout):
             values = [v for v in timeout.as_dict().values() if v is not None]
@@ -115,7 +187,7 @@ class OpenAI2ClaudeCodeLLM(CustomLLM):
 
         return timeout
 
-    def build_extra_headers(self, headers: dict | None, litellm_params: dict | None) -> dict:
+    def build_extra_headers(self, headers: dict | None, litellm_params: LiteLLMParamsTypedDict | dict | None) -> dict:
         litellm_params = litellm_params or {}
         litellm_metadata = litellm_params.get('metadata') or {}
         request_headers = litellm_metadata.get('headers') or {}

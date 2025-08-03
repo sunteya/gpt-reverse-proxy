@@ -1,8 +1,10 @@
 import httpx
 from typing import List, Dict, Any
 
+from litellm.types.router import LiteLLMParamsTypedDict
+
 class OpenAIClient:
-    def __init__(self, litellm_params: Dict[str, Any]):
+    def __init__(self, litellm_params: LiteLLMParamsTypedDict | dict):
         self.api_base = litellm_params.get("api_base")
         self.api_key = litellm_params.get("api_key")
         self._headers = {}
@@ -10,9 +12,6 @@ class OpenAIClient:
             self._headers["Authorization"] = f"Bearer {self.api_key}"
 
     async def get_models(self) -> List[Dict[str, Any]]:
-        """
-        Fetches models from an OpenAI-compatible API.
-        """
         if not self.api_base:
             print("`api_base` not found in litellm_params. Cannot fetch models.")
             return []
