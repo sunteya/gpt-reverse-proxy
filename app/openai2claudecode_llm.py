@@ -4,10 +4,12 @@ import httpx
 import litellm
 from litellm import LiteLLMParamsTypedDict
 from litellm.types.utils import GenericStreamingChunk, ModelResponse
-from litellm.exceptions import APIConnectionError, ServiceUnavailableError, InternalServerError
+from litellm.exceptions import APIConnectionError, ServiceUnavailableError, InternalServerError, Timeout, LITELLM_EXCEPTION_TYPES
 from litellm.llms.custom_llm import CustomLLM
 from litellm.litellm_core_utils.litellm_logging import Logging
 from litellm._logging import verbose_logger, verbose_proxy_logger
+from litellm.litellm_core_utils.streaming_handler import CustomStreamWrapper
+from litellm.llms.custom_llm import CustomLLMError
 
 from .streaming_converter import StreamingConverter
 
@@ -34,50 +36,23 @@ class OpenAI2ClaudeCodeLLM(CustomLLM):
         timeout = None,
         client = None,
     ):
+        verbose_proxy_logger.info(f"NON-STREAMING acompletion called for model={model}")
         litellm_params = litellm_params or {}
         model_info = litellm_params.get('model_info') or {}
         sponsor = model_info.get('sponsor', 'default')
         display_name = f"{model} ({sponsor})"
         verbose_proxy_logger.info(f"Proxying request for {display_name} to claude-code")
 
-        try:
-            response = await litellm.acompletion(
-                model=self.build_model(model),
-                messages=self.build_messages(messages, optional_params),
-                api_key=api_key,
-                api_base=api_base,
-                extra_headers=self.build_extra_headers(headers, litellm_params),
-                timeout=self.build_timeout(timeout),
-                **self.build_params(optional_params)
-            )
-            return response
-        except Exception as e:
-            # Log detailed exception information for debugging
-            exception_type = type(e).__name__
-            exception_module = type(e).__module__
-            exception_str = str(e)
-
-            verbose_proxy_logger.error(f"Exception caught in acompletion for {display_name}:")
-            verbose_proxy_logger.error(f"  Type: {exception_module}.{exception_type}")
-            verbose_proxy_logger.error(f"  Message: {exception_str}")
-            verbose_proxy_logger.error(f"  Exception object: {repr(e)}")
-
-            # Try to extract original error details
-            if hasattr(e, '__cause__') and e.__cause__:
-                cause_type = type(e.__cause__).__name__
-                cause_module = type(e.__cause__).__module__
-                verbose_proxy_logger.error(f"  Cause: {cause_module}.{cause_type} - {e.__cause__}")
-
-            # Check for response attribute
-            if hasattr(e, 'response'):
-                verbose_proxy_logger.error(f"  Has response attribute: {getattr(e, 'response', None)}")
-
-            # For now, raise ServiceUnavailableError for all exceptions
-            raise ServiceUnavailableError(
-                f"Service temporarily unavailable: {exception_str}",
-                llm_provider=self.provider_name,
-                model=display_name
-            )
+        response = await litellm.acompletion(
+            model=self.build_model(model),
+            messages=self.build_messages(messages, optional_params),
+            api_key=api_key,
+            api_base=api_base,
+            extra_headers=self.build_extra_headers(headers, litellm_params),
+            timeout=self.build_timeout(timeout),
+            **self.build_params(optional_params)
+        )
+        return response
 
     async def astreaming(self, # type: ignore[reportIncompatibleMethodOverride]
         model,
@@ -103,49 +78,23 @@ class OpenAI2ClaudeCodeLLM(CustomLLM):
         display_name = f"{model} ({sponsor})"
         verbose_proxy_logger.info(f"Proxying stream request for {display_name} to claude-code")
 
-        try:
-            response = await litellm.acompletion(
-                model=self.build_model(model),
-                messages=self.build_messages(messages, optional_params),
-                api_key=api_key,
-                api_base=api_base,
-                extra_headers=self.build_extra_headers(headers, litellm_params),
-                timeout=self.build_timeout(timeout),
-                **self.build_params(optional_params)
-            )
-        except Exception as e:
-            # Log detailed exception information for debugging
-            exception_type = type(e).__name__
-            exception_module = type(e).__module__
-            exception_str = str(e)
-
-            verbose_proxy_logger.error(f"Exception caught in acompletion for {display_name}:")
-            verbose_proxy_logger.error(f"  Type: {exception_module}.{exception_type}")
-            verbose_proxy_logger.error(f"  Message: {exception_str}")
-            verbose_proxy_logger.error(f"  Exception object: {repr(e)}")
-
-            # Try to extract original error details
-            if hasattr(e, '__cause__') and e.__cause__:
-                cause_type = type(e.__cause__).__name__
-                cause_module = type(e.__cause__).__module__
-                verbose_proxy_logger.error(f"  Cause: {cause_module}.{cause_type} - {e.__cause__}")
-
-            # Check for response attribute
-            if hasattr(e, 'response'):
-                verbose_proxy_logger.error(f"  Has response attribute: {getattr(e, 'response', None)}")
-
-            # For now, raise ServiceUnavailableError for all exceptions
-            raise ServiceUnavailableError(
-                f"Service temporarily unavailable: {exception_str}",
-                llm_provider=self.provider_name,
-                model=display_name
-            )
+        response = await litellm.acompletion(
+            model=self.build_model(model),
+            messages=self.build_messages(messages, optional_params),
+            api_key=api_key,
+            api_base=api_base,
+            extra_headers=self.build_extra_headers(headers, litellm_params),
+            timeout=self.build_timeout(timeout),
+            **self.build_params(optional_params)
+        )
 
         if isinstance(response, ModelResponse):
-            for chunk in StreamingConverter.convert_model_response_to_stream(response):
+            for chunk in StreamingConverter.convert_model_response(response):
+                # verbose_proxy_logger.info(f"Yielding chunk from async stream: {chunk}")
                 yield chunk
         else:
-            async for chunk in StreamingConverter.convert_async_stream(response):
+            async for chunk in StreamingConverter.convert_stream_wrapper(response):
+                # verbose_proxy_logger.info(f"Yielding chunk from async stream: {chunk}")
                 yield chunk
 
 

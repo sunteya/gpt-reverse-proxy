@@ -3,5 +3,5 @@ name = "gpt-reverse-proxy"
 version = "0"
 requires-python = ">=3.13"
 dependencies = [
-    "litellm[proxy]>=1.74.9.post1",
+    "litellm[proxy]==1.74.15.post1",
 ]

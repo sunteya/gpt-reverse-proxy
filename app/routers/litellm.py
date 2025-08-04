@@ -13,7 +13,7 @@ from app.config import Settings
 from app.auth import CustomAuth
 from .. import utils
 from .. import openai2claudecode_llm
-
+from litellm.proxy.common_utils import http_parsing_utils
 
 class EnrichModelsMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, router: Router):
@@ -39,13 +39,8 @@ class EnrichModelsMiddleware(BaseHTTPMiddleware):
             upstream_models = await client.get_models()
             return [upstream_model["id"] for upstream_model in upstream_models]
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]):
-        """This middleware enriches /models responses by expanding wildcard models."""
+    async def hook_dispatch_models(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]):
         response = await call_next(request)
-
-        if request.url.path not in ["/v1/models", "/models"]:
-            return response
-
         response_body = await utils.read_response_body(response)
 
         try:
@@ -72,6 +67,35 @@ class EnrichModelsMiddleware(BaseHTTPMiddleware):
             headers = dict(response.headers)
             headers.pop("content-length", None)
             return Response(content=response_body, status_code=response.status_code, media_type="application/json", headers=headers)
+
+    async def hook_chat_completions(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]):
+        body = await http_parsing_utils._read_request_body(request=request)
+        messages = body.get('messages') or []
+
+        new_messages = []
+        for message in messages:
+            converted_messages = utils.convert_to_openai_message(message)
+            new_messages.extend(converted_messages)
+
+        body['messages'] = new_messages
+
+        new_body = json.dumps(body).encode('utf-8')
+        request._body = new_body
+        request.scope["headers"] = [
+            (k, v) for k, v in request.scope["headers"]
+            if k.lower() != b"content-length"
+        ] + [(b"content-length", str(len(new_body)).encode())]
+
+        return await call_next(request)
+
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        if request.url.path in ["/v1/models", "/models"]:
+            return await self.hook_dispatch_models(request, call_next)
+        elif request.url.path in [ "/v1/chat/completions" ]:
+            return await self.hook_chat_completions(request, call_next)
+        else:
+            return await call_next(request)
+
 
 async def setup_litellm_routes(settings: Settings):
     config_path = settings.litellm_config_path

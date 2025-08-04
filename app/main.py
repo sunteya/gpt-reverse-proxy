@@ -1,5 +1,4 @@
 import asyncio
-import os
 import uvicorn
 
 # Initialize our own settings first, to avoid conflicts with litellm's .env loading.
