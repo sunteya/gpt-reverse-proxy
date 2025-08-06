@@ -1,5 +1,32 @@
 from starlette.responses import Response, StreamingResponse, AsyncContentStream
-from typing import cast
+from typing import cast, TypeVar, Type, Optional
+import json
+
+T = TypeVar('T', bound=BaseException)
+
+def find_exception_in_chain(exception: BaseException, target_type: Type[T]) -> Optional[T]:
+    """
+    Recursively search for an exception of the specified type in the exception chain.
+
+    Args:
+        exception: The exception to search.
+        target_type: The target exception type.
+
+    Returns:
+        The found exception instance, or None if not found.
+    """
+    current = exception
+    depth = 0
+    max_depth = 20  # Prevent infinite loop
+    
+    while current and depth < max_depth:
+        if isinstance(current, target_type):
+            return current
+        
+        current = getattr(current, '__context__', None)
+        depth += 1
+    
+    return None
 
 async def read_response_body(response: Response) -> bytes:
     if hasattr(response, 'body_iterator'):

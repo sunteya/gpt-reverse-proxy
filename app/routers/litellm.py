@@ -9,6 +9,7 @@ from starlette.responses import Response, StreamingResponse
 from litellm.router import Router
 from litellm.proxy import proxy_server
 from app.models.openai_client import OpenAIClient
+from app.models.claudecode_streaming import ClaudeCodeStreamingResponseWrapper
 from app.config import Settings
 from app.auth import CustomAuth
 from .. import utils
@@ -88,11 +89,45 @@ class EnrichModelsMiddleware(BaseHTTPMiddleware):
 
         return await call_next(request)
 
+    async def hook_messages(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]):
+        print(f"[hook_messages] Processing request to: {request.url.path}", flush=True)
+        
+        try:
+            response = await call_next(request)
+            
+            content_type = response.headers.get('content-type', '')
+            is_streaming = 'text/event-stream' in content_type
+            
+            if is_streaming:
+                print("[hook_messages] Detected SSE response, wrapping iterator", flush=True)
+                # Wrap the original iterator with our logging wrapper
+                wrapped_iterator = ClaudeCodeStreamingResponseWrapper(response.body_iterator)
+                
+                return StreamingResponse(
+                    wrapped_iterator,
+                    status_code=response.status_code,
+                    headers=dict(response.headers)
+                )
+            else:
+                print("[hook_messages] Detected standard response, returning as-is", flush=True)
+                return response
+                
+        except Exception as e:
+            print(f"[hook_messages] Exception occurred: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            return JSONResponse(
+                status_code=500,
+                content={"error": "An internal error occurred."}
+            )
+
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         if request.url.path in ["/v1/models", "/models"]:
             return await self.hook_dispatch_models(request, call_next)
         elif request.url.path in [ "/v1/chat/completions" ]:
             return await self.hook_chat_completions(request, call_next)
+        # elif request.url.path in ["/v1/messages"]:
+        #     return await self.hook_messages(request, call_next)
         else:
             return await call_next(request)
 
