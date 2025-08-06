@@ -1,0 +1,29 @@
+{
+  "private": true,
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.57.0",
+    "@hono/node-server": "1.17.1",
+    "consola": "2.15.3",
+    "dayjs": "1.11.13",
+    "dotenv": "16.6.1",
+    "dotenv-flow": "3.3.0",
+    "hono": "4.8.5",
+    "http-proxy-middleware": "3.0.5",
+    "https-proxy-agent": "5.0.1",
+    "js-yaml": "^4.1.0",
+    "lodash": "4.17.21",
+    "openai": "^5.11.0",
+    "tsx": "4.20.3",
+    "undici": "7.12.0",
+    "utility-types": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/dotenv-flow": "3.3.3",
+    "@types/js-yaml": "^4.0.9",
+    "@types/lodash": "4.17.20",
+    "@types/node": "24.1.0"
+  },
+  "scripts": {
+    "server": "tsx server.ts"
+  }
+}
