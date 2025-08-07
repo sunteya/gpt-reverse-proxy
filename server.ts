@@ -1,13 +1,15 @@
 import { serve } from '@hono/node-server'
-import consola, { LogLevel } from 'consola'
+import consola from 'consola'
 import { Hono } from 'hono'
 import * as fs from 'fs'
 import * as yaml from 'js-yaml'
 import { createHandler } from './endpoints'
-import { Upstream } from './endpoints/types'
-import { hookRegistry } from './lib/hookRegistry'
+import { UpstreamSettings } from './endpoints/types'
+import { HookRegistry } from './lib/HookRegistry'
+import { Dumper, generateDumpFilePath } from './lib/dumper'
+import { UpstreamRegistry } from './lib/UpstreamRegistry'
 
-consola.level = LogLevel.Debug
+consola.level = 4
 
 interface Endpoint {
   prefix: string
@@ -18,7 +20,7 @@ interface Endpoint {
 
 interface Config {
   endpoints: Endpoint[]
-  upstreams: Upstream[]
+  upstreams: UpstreamSettings[]
 }
 
 function loadConfig(): Config {
@@ -31,37 +33,29 @@ function loadConfig(): Config {
   }
 }
 
-function findUpstreamForGroup(upstreams: Upstream[], group: string | undefined): Upstream | null {
-  for (const upstream of upstreams) {
-    if (upstream.groups == undefined) {
-      return upstream
-    }
-
-    if (group == undefined) {
-      return upstream
-    }
-
-    if (upstream.groups.includes(group)) {
-      return upstream
-    }
-  }
-
-  return null
-}
-
 const config = loadConfig()
 consola.info(`Loaded ${config.endpoints.length} endpoints from config.yml`)
 
 // Load all hooks at startup
-hookRegistry.loadAllHooks().then(() => {
-  const loadedHooks = hookRegistry.listHooks()
+const hooks = new HookRegistry()
+hooks.loadAllHooks().then(() => {
+  const loadedHooks = hooks.listHooks()
   if (loadedHooks.length > 0) {
     consola.info(`Loaded ${loadedHooks.length} hooks: ${loadedHooks.join(', ')}`)
   }
 })
 
 const app = new Hono()
-// app.use('*', logger())
+app.use('*', (c, next) => {
+  consola.info(`url: ${c.req.method} ${c.req.url}`)
+
+  const dumpFilePath = generateDumpFilePath(c.req.path)
+  consola.info(`Dumping to ${dumpFilePath}`)
+  const dumper = new Dumper(dumpFilePath)
+  c.set('dumper', dumper)
+
+  return next()
+})
 
 for (const endpoint of config.endpoints) {
   consola.info(`Setting up ${endpoint.type} routes for ${endpoint.prefix} (group: ${endpoint.group})`)
@@ -74,14 +68,10 @@ for (const endpoint of config.endpoints) {
     hooks: endpoint.hooks
   }
 
-  // Create a function that dynamically finds upstream for any group
-  const upstreamGetter = (group?: string) => {
-    const targetGroup = group || endpoint.group
-    return findUpstreamForGroup(config.upstreams, targetGroup)
-  }
+  const upstreams = new UpstreamRegistry(config.upstreams, endpoint.group)
 
   // Create endpoint handler with settings
-  const handler = createHandler(endpoint.type, settings, upstreamGetter)
+  const handler = createHandler(endpoint.type, settings, upstreams, hooks)
   if (!handler) {
     consola.warn(`Unknown endpoint type: ${endpoint.type} for ${endpoint.prefix}`)
     continue

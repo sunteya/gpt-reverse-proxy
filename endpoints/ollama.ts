@@ -1,13 +1,10 @@
 import { Hono, Context, Next } from 'hono'
 import { BaseEndpointHandler } from './base'
-import { EndpointSettings, UpstreamGetter } from './types'
+import { EndpointSettings } from './types'
 import consola from 'consola'
+import { UpstreamRegistry } from '../lib/UpstreamRegistry'
 
 export class OllamaHandler extends BaseEndpointHandler {
-  constructor(settings: EndpointSettings, upstreamGetter: UpstreamGetter) {
-    super(settings, upstreamGetter)
-  }
-
   setupEndpointRoutes(app: Hono): void {
     // Custom route: handle /models endpoint locally
     app.get(`${this.settings.prefix}/api/tags`, async (c: Context) => {
@@ -35,9 +32,6 @@ export class OllamaHandler extends BaseEndpointHandler {
       })
     })
 
-    // Default: proxy all other requests to upstream through internal method
-    app.all(`${this.settings.prefix}/*`, async (c: Context, next: Next) => {
-      return this.handleProxyRequest(c, next)
-    })
+    app.all(`${this.settings.prefix}/*`, this.action(this.handle_remaining_routes))
   }
 }

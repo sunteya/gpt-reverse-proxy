@@ -1,11 +1,11 @@
 import { Hono } from 'hono'
-import { BaseHook } from '../lib/BaseHook'
 
-export interface Upstream {
+export interface UpstreamSettings {
   name: string
   groups: string[] | undefined
   api_base: string
   api_key: string
+  https_proxy?: string | null
 }
 
 export interface EndpointSettings {
@@ -14,8 +14,6 @@ export interface EndpointSettings {
   group: string | undefined
   hooks?: string[]
 }
-
-export type UpstreamGetter = (group?: string) => Upstream | null
 
 export interface RequestData {
   url: string
@@ -30,8 +28,6 @@ export interface ResponseData {
   body: string | null
   request?: RequestData
 }
-
-export type Hook = BaseHook
 
 export interface EndpointHandler {
   setupEndpointRoutes(app: Hono): void
