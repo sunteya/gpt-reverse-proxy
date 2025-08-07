@@ -2,17 +2,19 @@ import { Hono } from 'hono'
 
 export interface UpstreamSettings {
   name: string
-  groups: string[] | undefined
+  protocols: string[] | undefined
   api_base: string
   api_key: string
   https_proxy?: string | null
+
+  plugins?: string[]
+  models?: string[]
 }
 
 export interface EndpointSettings {
   prefix: string
   type: string
-  group: string | undefined
-  hooks?: string[]
+  plugins?: string[]
 }
 
 export interface RequestData {

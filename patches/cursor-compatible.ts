@@ -3,12 +3,12 @@ import { Context } from 'hono'
 import { Hook } from '../lib/Hook'
 import { DumpEventSourceStream } from '../lib/DumpEventSourceStream'
 import { EventSourceEncoderStream } from '../lib/EventSourceEncoderStream'
-
+import { DumpStream } from '../lib/DumpStream'
 
 class CursorCompatibleHook extends Hook {
   name = 'cursor-compatible'
 
-  handleChatCompletions(response: Response, request: Request, ctx: Context) {
+  handle_chat_completions_response(response: Response, request: Request, ctx: Context) {
     if (!this.isStreamingResponse(response)) {
       return response
     }
@@ -19,8 +19,8 @@ class CursorCompatibleHook extends Hook {
     }
 
     const eventStream = originalStream.pipeThrough(new TextDecoderStream())
+                                      .pipeThrough(new DumpStream('raw chunk', ctx.get('dumper')))
                                       .pipeThrough(new EventSourceParserStream())
-                                      .pipeThrough(new DumpEventSourceStream('upstream', ctx.get('dumper')))
                                       .pipeThrough(this.createFinishReasonCleanerStream())
                                       .pipeThrough(new DumpEventSourceStream('converted', ctx.get('dumper')))
                                       .pipeThrough(new EventSourceEncoderStream())
@@ -35,7 +35,7 @@ class CursorCompatibleHook extends Hook {
 
   async onResponse(response: Response, request: Request, ctx: Context): Promise<Response> {
     if (request.url.includes('/v1/chat/completions')) {
-      return this.handleChatCompletions(response, request, ctx)
+      return this.handle_chat_completions_response(response, request, ctx)
     }
 
     return response
@@ -70,5 +70,4 @@ class CursorCompatibleHook extends Hook {
   }
 }
 
-// Export instance
 export default new CursorCompatibleHook()

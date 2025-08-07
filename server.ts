@@ -4,22 +4,16 @@ import { Hono } from 'hono'
 import * as fs from 'fs'
 import * as yaml from 'js-yaml'
 import { createHandler } from './endpoints'
-import { UpstreamSettings } from './endpoints/types'
+import { EndpointSettings, UpstreamSettings } from './endpoints/types'
 import { HookRegistry } from './lib/HookRegistry'
 import { Dumper, generateDumpFilePath } from './lib/dumper'
 import { UpstreamRegistry } from './lib/UpstreamRegistry'
+import path from 'path'
 
 consola.level = 4
 
-interface Endpoint {
-  prefix: string
-  type: string
-  group: string | undefined
-  hooks?: string[]
-}
-
 interface Config {
-  endpoints: Endpoint[]
+  endpoints: EndpointSettings[]
   upstreams: UpstreamSettings[]
 }
 
@@ -36,14 +30,10 @@ function loadConfig(): Config {
 const config = loadConfig()
 consola.info(`Loaded ${config.endpoints.length} endpoints from config.yml`)
 
-// Load all hooks at startup
+const root = process.cwd()
 const hooks = new HookRegistry()
-hooks.loadAllHooks().then(() => {
-  const loadedHooks = hooks.listHooks()
-  if (loadedHooks.length > 0) {
-    consola.info(`Loaded ${loadedHooks.length} hooks: ${loadedHooks.join(', ')}`)
-  }
-})
+await hooks.loadFromDirectory(root, 'patches')
+await hooks.loadFromDirectory(root, 'transformers')
 
 const app = new Hono()
 app.use('*', (c, next) => {
@@ -57,23 +47,14 @@ app.use('*', (c, next) => {
   return next()
 })
 
-for (const endpoint of config.endpoints) {
-  consola.info(`Setting up ${endpoint.type} routes for ${endpoint.prefix} (group: ${endpoint.group})`)
+const upstreams = new UpstreamRegistry(config.upstreams, hooks)
 
-  // Create endpoint settings
-  const settings = {
-    prefix: endpoint.prefix,
-    type: endpoint.type,
-    group: endpoint.group,
-    hooks: endpoint.hooks
-  }
+for (const settings of config.endpoints) {
+  consola.info(`Setting up ${settings.type} routes for ${settings.prefix}`)
 
-  const upstreams = new UpstreamRegistry(config.upstreams, endpoint.group)
-
-  // Create endpoint handler with settings
-  const handler = createHandler(endpoint.type, settings, upstreams, hooks)
+  const handler = createHandler(settings.type, settings, upstreams, hooks)
   if (!handler) {
-    consola.warn(`Unknown endpoint type: ${endpoint.type} for ${endpoint.prefix}`)
+    consola.warn(`Unknown endpoint type: ${settings.type} for ${settings.prefix}`)
     continue
   }
 
@@ -86,10 +67,10 @@ serve({ fetch: app.fetch, port }, (info) => {
   consola.info(`Server listening on port ${info.port}`)
   consola.info(`Loaded ${config.upstreams.length} upstreams:`)
   for (const upstream of config.upstreams) {
-    consola.info(`  ${upstream.name} (groups: ${upstream.groups?.join(', ')}) -> ${upstream.api_base}`)
+    consola.info(`  ${upstream.name} -> ${upstream.api_base}`)
   }
   consola.info(`Configured ${config.endpoints.length} endpoints:`)
   for (const endpoint of config.endpoints) {
-    consola.info(`  ${endpoint.prefix} (${endpoint.type}, group: ${endpoint.group})`)
+    consola.info(`  ${endpoint.prefix} (${endpoint.type})`)
   }
 })

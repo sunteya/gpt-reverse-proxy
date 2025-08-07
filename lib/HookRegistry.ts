@@ -4,42 +4,39 @@ import consola from 'consola'
 import { Hook } from './Hook'
 
 export class HookRegistry {
-  patches: Map<string, Hook> = new Map()
+  mapping: Map<string, Hook> = new Map()
 
-  async loadAllHooks() {
-    const patchesDir = path.join(process.cwd(), 'patches')
-
-    if (!fs.existsSync(patchesDir)) {
-      consola.info('Patches directory not found, creating it...')
-      fs.mkdirSync(patchesDir, { recursive: true })
+  async loadFromDirectory(root: string, folder: string) {
+    const directory = path.join(root, folder)
+    if (!fs.existsSync(directory)) {
+      consola.warn(`Directory not found, skipping: ${directory}`)
       return
     }
 
-    const files = fs.readdirSync(patchesDir)
-    const tsFiles = files.filter(file => file.endsWith('.ts'))
+    const files = fs.readdirSync(directory).filter(file => file.endsWith('.ts'))
+    consola.info(`Found ${files.length} hooks in ${directory}`)
 
-    for (const file of tsFiles) {
-      const patchName = path.basename(file, '.ts')
+    for (const file of files) {
+      const hookPath = path.join(directory, file)
+      const hookName = path.join(folder, path.basename(file, '.ts'))
       try {
-        const patchPath = path.join(patchesDir, file)
-        const patchModule = await import(patchPath)
-        const patch: Hook = patchModule.default || patchModule
+        const hookModule = await import(hookPath)
+        const hook: Hook = hookModule.default || hookModule
 
-        // Ensure it's a Hook instance
-        if (patch instanceof Hook) {
-          this.patches.set(patchName, patch)
-          consola.info(`Loaded patch: ${patchName}`)
+        if (hook instanceof Hook) {
+          this.mapping.set(hookName, hook)
+          consola.info(`Loaded hook: ${hookName}`)
         } else {
-          consola.warn(`Patch ${patchName} is not a Hook instance, skipping`)
+          consola.warn(`Hook ${hookName} is not a Hook instance, skipping`)
         }
       } catch (error) {
-        consola.error(`Failed to load patch ${patchName}:`, error)
+        consola.error(`Failed to load hook ${hookName}:`, error)
       }
     }
   }
 
   getHook(name: string): Hook | undefined {
-    return this.patches.get(name)
+    return this.mapping.get(name)
   }
 
   getHooks(names: string[]): Hook[] {
@@ -47,6 +44,6 @@ export class HookRegistry {
   }
 
   listHooks(): string[] {
-    return Array.from(this.patches.keys())
+    return Array.from(this.mapping.keys())
   }
 }

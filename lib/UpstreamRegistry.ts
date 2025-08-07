@@ -1,39 +1,54 @@
 import { UpstreamSettings } from '../endpoints/types'
 import { UpstreamNotFoundError } from './errors'
-import { Upstream } from '../proxy/proxy'
+import { Upstream } from './Upstream'
+import { HookRegistry } from './HookRegistry'
+import { minimatch } from 'minimatch'
+
+export type FindUpstreamConds = {
+  group?: string
+  model?: string | null
+  protocol?: string | null
+}
 
 export class UpstreamRegistry {
-  private upstreams: UpstreamSettings[]
-  private defaultGroup?: string
+  config: UpstreamSettings[]
+  hookRegistry: HookRegistry
 
-  constructor(upstreams: UpstreamSettings[], defaultGroup?: string) {
-    this.upstreams = upstreams
-    this.defaultGroup = defaultGroup
+  constructor(config: UpstreamSettings[], hookRegistry: HookRegistry) {
+    this.config = config
+    this.hookRegistry = hookRegistry
   }
 
-    find({ group, model, protocol }: { group?: string; model?: string | null; protocol?: string | null }): Upstream {
-    const targetGroup = group || this.defaultGroup
-    const settings = this.findUpstreamForGroup(targetGroup)
+  find(conds: FindUpstreamConds): Upstream {
+    const settings = this.matchSettings(conds)
     if (!settings) {
-      throw new UpstreamNotFoundError(`No upstream found for group: ${targetGroup}`)
+      throw new UpstreamNotFoundError(`No upstream found for: ${conds}`)
     }
-    return new Upstream(settings)
+
+    return new Upstream(settings, this.hookRegistry)
   }
 
-  findUpstreamForGroup(group: string | undefined): UpstreamSettings | null {
-    for (const upstream of this.upstreams) {
-      if (upstream.groups == undefined) {
-        return upstream
-      }
+  matchSettings(conds: FindUpstreamConds): UpstreamSettings | null {
+    const availableSettings = this.config.filter(settings => {
+      return this.isMatchProtocol(settings, conds.protocol) && this.isMatchModel(settings, conds.model)
+    })
 
-      if (group == undefined) {
-        return upstream
-      }
-
-      if (upstream.groups.includes(group)) {
-        return upstream
-      }
+    if (!availableSettings.length) {
+      return null
     }
-    return null
+
+    return availableSettings[0]
+  }
+
+  isMatchProtocol(settings: UpstreamSettings, protocol: string | undefined | null) {
+    if (!protocol) { return true }
+    if (!settings.protocols) { return true }
+    return settings.protocols.includes(protocol)
+  }
+
+  isMatchModel(settings: UpstreamSettings, model: string | null | undefined) {
+    if (!model) { return true }
+    if (!settings.models) { return true }
+    return settings.models.some((pattern) => minimatch(model, pattern))
   }
 }

@@ -1,40 +1,38 @@
 import { Hono } from 'hono'
 import { Context, Next } from 'hono'
-import { Upstream } from '../proxy/proxy'
+import { Upstream } from '../lib/Upstream'
 import { EndpointHandler, EndpointSettings } from './types'
 import { UpstreamRegistry } from '../lib/UpstreamRegistry'
 import * as utils from '../lib/utils'
 import { UpstreamNotFoundError } from '../lib/errors'
 import consola from 'consola'
 import { HookRegistry } from '../lib/HookRegistry'
+import { Hook } from '../lib/Hook'
 
 export abstract class BaseEndpointHandler implements EndpointHandler {
   settings: EndpointSettings
   upstreams: UpstreamRegistry
-  hooks: HookRegistry
+  hooks: Hook[]
 
-  constructor(settings: EndpointSettings, upstreams: UpstreamRegistry, hooks: HookRegistry) {
+  constructor(settings: EndpointSettings, upstreams: UpstreamRegistry, hookRegistry: HookRegistry) {
     this.settings = settings
     this.upstreams = upstreams
-    this.hooks = hooks
+
+    this.hooks = hookRegistry.getHooks(settings.plugins ?? [])
   }
 
   async hookRequest(request: Request, ctx: Context): Promise<Request> {
-    const hooks = this.hooks.getHooks(this.settings.hooks ?? [])
-    
     let modifiedRequest = request
-    for (const hook of hooks) {
+    for (const hook of this.hooks) {
       modifiedRequest = await hook.onRequest(modifiedRequest, ctx)
     }
 
     return modifiedRequest
   }
 
-  protected async hookResponse(response: Response, request: Request, ctx: Context): Promise<Response> {
-    const hooks = this.hooks.getHooks(this.settings.hooks ?? [])
-
+  async hookResponse(response: Response, request: Request, ctx: Context): Promise<Response> {
     let modifiedResponse = response
-    for (const hook of hooks) {
+    for (const hook of this.hooks.reverse()) {
       modifiedResponse = await hook.onResponse(modifiedResponse, request, ctx)
     }
     
@@ -59,19 +57,17 @@ export abstract class BaseEndpointHandler implements EndpointHandler {
     })
   }
 
-  async handleProxyRequest(ctx: Context, next: Next, upstream: Upstream) {
-    const request = this.buildStrippedRequest(ctx)
+  async handleProxyRequest(request: Request, ctx: Context, next: Next, upstream: Upstream) {
     const modifiedRequest = await this.hookRequest(request, ctx)
-
     const response = await upstream.handle(modifiedRequest, ctx)
-
     return await this.hookResponse(response, modifiedRequest, ctx)
   }
 
-  action(callback: (c: Context, next: Next) => Promise<Response>) {
+  action(callback: (request: Request, ctx: Context, next: Next) => Promise<Response>) {
     return async (c: Context, next: Next) => {
       try {
-        return await callback.call(this, c, next)
+        const request = this.buildStrippedRequest(c)
+        return await callback.call(this, request, c, next)
       } catch (error) {
         consola.error(error)
 
@@ -84,9 +80,9 @@ export abstract class BaseEndpointHandler implements EndpointHandler {
     }
   }
 
-  async handle_remaining_routes(c: Context, next: Next) {
-    const upstream = this.upstreams.find({ group: this.settings.group, model: null })
-    return this.handleProxyRequest(c, next, upstream)
+  async handle_remaining_routes(request: Request, ctx: Context, next: Next) {
+    const upstream = this.upstreams.find({ protocol: this.settings.type, model: null })
+    return this.handleProxyRequest(request, ctx, next, upstream)
   }
 
   abstract setupEndpointRoutes(app: Hono): void
