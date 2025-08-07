@@ -9,6 +9,8 @@ export class Upstream {
   settings: UpstreamSettings
   plugins: Hook[]
 
+  get name() { return this.settings.name ?? 'unknown' }
+
   constructor(settings: UpstreamSettings, hookRegistry: HookRegistry) {
     this.settings = settings
     this.plugins = hookRegistry.getHooks(settings.plugins ?? [])
@@ -54,7 +56,7 @@ export class Upstream {
       targetUrl.pathname = `${remotePath}/${incomingPath}`
     }
 
-    consola.info(`Proxying request: ${c.req.method} ${c.req.path} -> ${targetUrl.toString()}`)
+    consola.info(`Proxying request: [${this.name}] ${c.req.method} ${c.req.path} -> ${targetUrl.toString()}`)
 
     const headers = new Headers(request.headers)
     headers.delete('host')
@@ -71,18 +73,31 @@ export class Upstream {
     const agent = this.settings.https_proxy ? new ProxyAgent(this.settings.https_proxy) : undefined
     const dispatcher = agent ? { dispatcher: agent } : {}
 
-    const rawResponse = await fetch(targetUrl.toString(), {
-      method: request.method,
-      headers: headers,
-      body: request.body,
-      // @ts-ignore
-      duplex: 'half',
-      ...dispatcher,
-    })
+    let rawResponse: Response
+
+    if ([ 'GET', 'HEAD' ].includes(request.method)) {
+      rawResponse = await fetch(targetUrl.toString(), {
+        method: request.method,
+        headers: headers,
+        // @ts-ignore
+        duplex: 'half',
+        ...dispatcher,
+      })
+    } else {
+      rawResponse = await fetch(targetUrl.toString(), {
+        method: request.method,
+        headers: headers,
+        body: body,
+        // @ts-ignore
+        duplex: 'half',
+        ...dispatcher,
+      })
+    }
+
 
     consola.info(`Response received: ${rawResponse.status} ${rawResponse.statusText}`)
 
-    const response = await this.hookResponse(rawResponse, request, c)
+    const response = await this.hookResponse(rawResponse, rawRequest, c)
     return response
   }
 }

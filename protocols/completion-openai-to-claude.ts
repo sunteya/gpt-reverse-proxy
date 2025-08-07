@@ -1,6 +1,9 @@
+import { Anthropic } from '@anthropic-ai/sdk/client'
+import OpenAI from 'openai'
 import { MessageCreateParamsBase as ClaudeCompletionParams } from '@anthropic-ai/sdk/resources/messages'
-import { ChatCompletionCreateParamsBase as OpenAICompletionParams } from 'openai/resources/chat/completions'
+import { ChatCompletionChunk, ChatCompletionCreateParamsBase as OpenAICompletionParams } from 'openai/resources/chat/completions'
 import { ValuesType } from 'utility-types'
+import { EventSourceMessage } from 'eventsource-parser'
 
 function convertToolsToClaudeFormat(openaiTools: any[]): any[] {
   return openaiTools.map(tool => {
@@ -15,7 +18,7 @@ function convertToolsToClaudeFormat(openaiTools: any[]): any[] {
   })
 }
 
-export function completionOpenAIToClaude(openaiRequest: OpenAICompletionParams): ClaudeCompletionParams {
+export function openaiCompletionRequestToClaude(openaiRequest: OpenAICompletionParams): ClaudeCompletionParams {
   const claudeRequest: Partial<ClaudeCompletionParams> = {
     model: openaiRequest.model,
     messages: []
@@ -92,4 +95,149 @@ export function completionOpenAIToClaude(openaiRequest: OpenAICompletionParams):
   }
 
   return claudeRequest as ClaudeCompletionParams
+}
+
+export function claudeMessageResponseToOpenAI(message: Anthropic.Messages.Message): OpenAI.Chat.Completions.ChatCompletion {
+  const finishReasonMapping = {
+    'end_turn': 'stop',
+    'max_tokens': 'length',
+    'tool_use': 'tool_calls',
+    'stop_sequence': 'stop',
+    'pause_turn': 'stop',
+    'refusal': 'stop',
+  } satisfies Record<NonNullable<Anthropic.Messages.Message['stop_reason']>, OpenAI.Chat.Completions.ChatCompletion.Choice['finish_reason']>
+
+  const choice: OpenAI.Chat.Completions.ChatCompletion.Choice = {
+    index: 0,
+    message: { role: 'assistant', content: null, refusal: null },
+    logprobs: null,
+    finish_reason: finishReasonMapping[message.stop_reason ?? 'end_turn']
+  }
+
+  const textBlocks = message.content.filter((c): c is Anthropic.Messages.TextBlock => c.type === 'text')
+  if (textBlocks.length > 0) {
+    choice.message.content = textBlocks.map(c => c.text).join('')
+  }
+
+  const toolUseBlocks = message.content.filter((c): c is Anthropic.Messages.ToolUseBlock => c.type === 'tool_use')
+  if (toolUseBlocks.length > 0) {
+    choice.message.tool_calls = toolUseBlocks.map(toolUse => ({
+      id: toolUse.id,
+      type: 'function',
+      function: {
+        name: toolUse.name,
+        arguments: JSON.stringify(toolUse.input)
+      }
+    }))
+  }
+
+  return {
+    id: `chatcmpl-${message.id}`,
+    choices: [choice],
+    created: Math.floor(Date.now() / 1000),
+    model: message.model,
+    object: 'chat.completion',
+    usage: {
+      prompt_tokens: message.usage.input_tokens,
+      completion_tokens: message.usage.output_tokens,
+      total_tokens: message.usage.input_tokens + message.usage.output_tokens
+    }
+  }
+}
+
+export class ClaudeToOpenAIStream extends TransformStream<EventSourceMessage, EventSourceMessage> {
+  id: string | null = null
+  model: string | null = null
+
+  constructor() {
+    super({
+      transform: (chunk, controller) => {
+        this.handleTransform(chunk, controller)
+      }
+    })
+  }
+
+  handleTransform(source: EventSourceMessage, controller: TransformStreamDefaultController<EventSourceMessage>) {
+    if (source.data === '[DONE]') {
+      controller.enqueue(source)
+      controller.terminate()
+      return
+    }
+
+    const json = JSON.parse(source.data) as Anthropic.MessageStreamEvent
+
+    if (json.type === 'message_start') {
+      const { message } = json as Anthropic.Messages.MessageStartEvent
+      this.id = `chatcmpl-${message.id}`
+      this.model = message.model
+    } else if (!this.id || !this.model) {
+      // We haven't received the message_start event yet, so we can't process this event.
+      // This is to protect against cases where the stream doesn't start with message_start.
+      // We will just ignore these events.
+      return
+    }
+
+    // Handle terminal events first
+    if (json.type === 'message_stop') {
+      controller.enqueue({ id: source.id, data: '[DONE]' })
+      controller.terminate()
+      return
+    }
+    if (source.event === 'error' || json.type === 'error') {
+      // Propagate error (maybe transform it)
+      controller.enqueue(source)
+      controller.terminate()
+      return
+    }
+
+    const chunk: Partial<ChatCompletionChunk> = {
+      id: this.id,
+      model: this.model,
+      created: Math.floor(Date.now() / 1000),
+      object: 'chat.completion.chunk',
+      choices: [
+        {
+          index: 0,
+          delta: {},
+          finish_reason: null
+        }
+      ]
+    }
+
+    if (json.type === 'message_start') {
+      const { message } = json as Anthropic.Messages.MessageStartEvent
+      chunk.choices![0].delta = { role: message.role }
+      controller.enqueue({ id: source.id, data: JSON.stringify(chunk) })
+      return
+    }
+
+    if (json.type === 'content_block_delta') {
+      const { delta } = json as Anthropic.Messages.ContentBlockDeltaEvent
+      if (delta.type === 'text_delta') {
+        chunk.choices![0].delta = { content: delta.text }
+        controller.enqueue({ id: source.id, data: JSON.stringify(chunk) })
+      }
+      // Can handle tool deltas here in the future
+      return
+    }
+
+    if (json.type === 'message_delta') {
+      const { delta } = json as Anthropic.Messages.MessageDeltaEvent
+      if (delta.stop_reason) {
+        const finishReasonMapping: Record<string, OpenAI.Chat.Completions.ChatCompletion.Choice['finish_reason']> = {
+          end_turn: 'stop',
+          max_tokens: 'length',
+          tool_use: 'tool_calls',
+          stop_sequence: 'stop'
+        }
+        chunk.choices![0].finish_reason = finishReasonMapping[delta.stop_reason]
+        // The delta is empty in this case, which is correct for a finish_reason chunk
+        controller.enqueue({ id: source.id, data: JSON.stringify(chunk) })
+      }
+      return
+    }
+
+    // Do not enqueue for unhandled events like:
+    // content_block_start, content_block_stop, ping
+  }
 }

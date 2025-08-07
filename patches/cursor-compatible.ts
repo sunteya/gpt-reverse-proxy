@@ -1,9 +1,54 @@
-import { EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream'
 import { Context } from 'hono'
-import { Hook } from '../lib/Hook'
-import { DumpEventSourceStream } from '../lib/DumpEventSourceStream'
-import { EventSourceEncoderStream } from '../lib/EventSourceEncoderStream'
 import { DumpStream } from '../lib/DumpStream'
+import { Hook } from '../lib/Hook'
+
+class FinishReasonCleanerStream extends TransformStream<string, string> {
+  buffer = ''
+  target = ',"finish_reason":null'
+  targetLen = this.target.length
+
+  constructor() {
+    super({
+      transform: (chunk, controller) => this.transform(chunk, controller),
+      flush: (controller) => this.flush(controller),
+    })
+  }
+
+  transform(chunk: string, controller: TransformStreamDefaultController<string>) {
+    const combined = this.buffer + chunk
+    const cleaned = combined.replaceAll(this.target, '')
+
+    let holdBackPosition = -1
+
+    // Find the longest suffix of `cleaned` that is a prefix of `target`.
+    for (let i = Math.min(cleaned.length, this.targetLen - 1); i > 0; i--) {
+      const suffix = cleaned.substring(cleaned.length - i)
+      if (this.target.startsWith(suffix)) {
+        holdBackPosition = cleaned.length - i
+        break
+      }
+    }
+
+    if (holdBackPosition !== -1) {
+      const partToEnqueue = cleaned.substring(0, holdBackPosition)
+      this.buffer = cleaned.substring(holdBackPosition)
+      if (partToEnqueue) {
+        controller.enqueue(partToEnqueue)
+      }
+    } else {
+      this.buffer = ''
+      if (cleaned) {
+        controller.enqueue(cleaned)
+      }
+    }
+  }
+
+  private flush(controller: TransformStreamDefaultController<string>) {
+    if (this.buffer) {
+      controller.enqueue(this.buffer)
+    }
+  }
+}
 
 class CursorCompatibleHook extends Hook {
   name = 'cursor-compatible'
@@ -20,10 +65,11 @@ class CursorCompatibleHook extends Hook {
 
     const eventStream = originalStream.pipeThrough(new TextDecoderStream())
                                       .pipeThrough(new DumpStream('raw chunk', ctx.get('dumper')))
-                                      .pipeThrough(new EventSourceParserStream())
-                                      .pipeThrough(this.createFinishReasonCleanerStream())
-                                      .pipeThrough(new DumpEventSourceStream('converted', ctx.get('dumper')))
-                                      .pipeThrough(new EventSourceEncoderStream())
+                                      .pipeThrough(new FinishReasonCleanerStream())
+                                      // .pipeThrough(new EventSourceParserStream())
+                                      // .pipeThrough(new DumpEventSourceStream('converted', ctx.get('dumper')))
+                                      // .pipeThrough(new EventSourceEncoderStream())
+                                      .pipeThrough(new DumpStream('converted', ctx.get('dumper')))
                                       .pipeThrough(new TextEncoderStream())
 
     return new Response(eventStream, {
@@ -39,34 +85,6 @@ class CursorCompatibleHook extends Hook {
     }
 
     return response
-  }
-
-  createFinishReasonCleanerStream(): TransformStream<EventSourceMessage, EventSourceMessage> {
-    return new TransformStream({
-      transform: (source, controller) => {
-        if (source.data === '[DONE]') {
-          controller.enqueue(source)
-          return
-        }
-
-        const json = this.parseObject(source.data)
-        if (!json) {
-          controller.enqueue(source)
-          return
-        }
-
-        const choices = json.choices
-        if (Array.isArray(json.choices)) {
-          for (const choice of choices) {
-            if (choice.finish_reason === null) {
-              delete choice.finish_reason
-            }
-          }
-        }
-
-        controller.enqueue({ ...source, data: JSON.stringify(json) })
-      }
-    })
   }
 }
 

@@ -3,6 +3,7 @@ import { UpstreamNotFoundError } from './errors'
 import { Upstream } from './Upstream'
 import { HookRegistry } from './HookRegistry'
 import { minimatch } from 'minimatch'
+import consola from 'consola'
 
 export type FindUpstreamConds = {
   group?: string
@@ -29,6 +30,8 @@ export class UpstreamRegistry {
   }
 
   matchSettings(conds: FindUpstreamConds): UpstreamSettings | null {
+    consola.info(`Matching settings for: ${JSON.stringify(conds)}`)
+
     const availableSettings = this.config.filter(settings => {
       return this.isMatchProtocol(settings, conds.protocol) && this.isMatchModel(settings, conds.model)
     })
@@ -37,6 +40,7 @@ export class UpstreamRegistry {
       return null
     }
 
+    consola.info(`Found ${availableSettings.length} settings for: ${JSON.stringify(conds)}`)
     return availableSettings[0]
   }
 

@@ -1,6 +1,13 @@
 import { Context } from 'hono'
 import { Hook } from '../lib/Hook'
 import * as protocols from '../protocols'
+import { Anthropic } from '@anthropic-ai/sdk/client'
+import { EventSourceEncoderStream } from '../lib/EventSourceEncoderStream'
+import { EventSourceParserStream } from 'eventsource-parser/stream'
+import { DumpStream } from '../lib/DumpStream'
+import { DumpEventSourceStream } from '../lib/DumpEventSourceStream'
+import { EventSourceMessage } from 'eventsource-parser'
+import { ChatCompletionChunk } from 'openai/resources/index'
 
 class OpenaiToClaudeHook extends Hook {
   name = 'openai-to-claude'
@@ -11,9 +18,11 @@ class OpenaiToClaudeHook extends Hook {
 
   async on_chat_completions_request(request: Request, ctx: Context) {
     const json = await request.clone().json()
-    const newJson = protocols.completionOpenAIToClaude(json)
+    const newJson = protocols.openaiCompletionRequestToClaude(json)
 
-    return new Request(request.url, {
+    const newUrl = request.url.replace('/v1/chat/completions', '/v1/messages')
+
+    return new Request(newUrl, {
       method: request.method,
       headers: request.headers,
       body: JSON.stringify(newJson)
@@ -21,7 +30,39 @@ class OpenaiToClaudeHook extends Hook {
   }
 
   async on_chat_completions_response(response: Response, request: Request, ctx: Context) {
-    return response
+    if (this.isStreamingResponse(response)) {
+      const originalStream = response.body
+      if (!originalStream) {
+        return response
+      }
+
+      const eventStream = originalStream
+        .pipeThrough(new TextDecoderStream())
+        .pipeThrough(new DumpStream('raw chunk', ctx.get('dumper')))
+        .pipeThrough(new EventSourceParserStream())
+        .pipeThrough(new protocols.ClaudeToOpenAIStream())
+        .pipeThrough(new DumpEventSourceStream('converted', ctx.get('dumper')))
+        .pipeThrough(new EventSourceEncoderStream())
+        .pipeThrough(new TextEncoderStream())
+
+      return new Response(eventStream, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers
+      })
+    }
+
+    if (response.status !== 200) {
+      return response
+    }
+
+    const json = await response.json()
+    const newJson = protocols.claudeMessageResponseToOpenAI(json)
+    return new Response(JSON.stringify(newJson), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers
+    })
   }
 
   async onRequest(request: Request, ctx: Context) {
