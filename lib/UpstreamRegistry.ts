@@ -21,27 +21,24 @@ export class UpstreamRegistry {
   }
 
   find(conds: FindUpstreamConds): Upstream {
-    const settings = this.matchSettings(conds)
-    if (!settings) {
+    const settingsList = this.matchSettings(conds)
+    if (!settingsList.length) {
       throw new UpstreamNotFoundError(`No upstream found for: ${conds}`)
     }
-
-    return new Upstream(settings, this.hookRegistry)
+    return new Upstream(settingsList[0], this.hookRegistry)
   }
 
-  matchSettings(conds: FindUpstreamConds): UpstreamSettings | null {
+  findAll(conds: FindUpstreamConds): Upstream[] {
+    const settingsList = this.matchSettings(conds)
+    if (!settingsList.length) { return [] }
+    return settingsList.map(s => new Upstream(s, this.hookRegistry))
+  }
+
+  matchSettings(conds: FindUpstreamConds): UpstreamSettings[] {
     consola.info(`Matching settings for: ${JSON.stringify(conds)}`)
-
-    const availableSettings = this.config.filter(settings => {
-      return this.isMatchProtocol(settings, conds.protocol) && this.isMatchModel(settings, conds.model)
-    })
-
-    if (!availableSettings.length) {
-      return null
-    }
-
+    const availableSettings = this.config.filter(settings => this.isMatchProtocol(settings, conds.protocol) && this.isMatchModel(settings, conds.model))
     consola.info(`Found ${availableSettings.length} settings for: ${JSON.stringify(conds)}`)
-    return availableSettings[0]
+    return availableSettings
   }
 
   isMatchProtocol(settings: UpstreamSettings, protocol: string | undefined | null) {

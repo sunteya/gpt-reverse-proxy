@@ -1,35 +1,43 @@
 import consola from 'consola'
-import { Context, Hono } from 'hono'
+import { Context, Hono, Next } from 'hono'
 import { BaseEndpointHandler } from './base'
 
 export class OllamaHandler extends BaseEndpointHandler {
+  async handle_api_tags(request: Request, ctx: Context, next: Next) {
+    consola.info('handle_api_tags')
+    const modifiedRequest = await this.hookRequest(request, ctx)
+    const upstreams = this.upstreams.findAll({ protocol: this.settings.type, model: null })
+    const results = await Promise.allSettled(
+      upstreams.map(u => u.handle(modifiedRequest.clone(), ctx).then(r => r.json()))
+    )
+
+    const models = results.flatMap(r => (r.status === 'fulfilled' && Array.isArray(r.value?.models)) ? r.value.models : [])
+    const seenNames = new Set<string>()
+    const deduped = models.filter(m => {
+      const name = (m && typeof (m as any).name === 'string') ? (m as any).name as string : undefined
+      if (!name) return false
+      if (seenNames.has(name)) return false
+      seenNames.add(name)
+      return true
+    })
+
+    const response = ctx.json({ models: deduped })
+    return await this.hookResponse(response, modifiedRequest, ctx)
+  }
+
+  async handle_api_show(request: Request, ctx: Context, next: Next) {
+    consola.info('handle_api_show')
+    const modifiedRequest = await this.hookRequest(request, ctx)
+    const response = ctx.json({
+      model_info: { 'general.architecture': 'CausalLM' },
+      capabilities: ['chat', 'tools', 'stop', 'reasoning']
+    })
+    return await this.hookResponse(response, modifiedRequest, ctx)
+  }
+
   setupEndpointRoutes(app: Hono): void {
-    // Custom route: handle /models endpoint locally
-    app.get(`${this.settings.prefix}/api/tags`, async (c: Context) => {
-      consola.info(`Handling local ${this.settings.prefix}/api/tags request`)
-      
-      // Example: return local model list
-      return c.json({
-        models: [
-          {
-            name: "llama2:latest",
-            size: 3826793677,
-            digest: "sha256:bc07c81de745696fdf5afca05e065818a8149fb0c77266fb584d5b2bb96e9d1a",
-            modified_at: "2023-12-07T09:32:18.757212583Z"
-          }
-        ]
-      })
-    })
-
-    // Custom route: handle version endpoint locally
-    app.get(`${this.settings.prefix}/api/version`, async (c: Context) => {
-      consola.info(`Handling local ${this.settings.prefix}/api/version request`)
-      
-      return c.json({
-        version: "0.1.0"
-      })
-    })
-
+    app.get(`${this.settings.prefix}/api/tags`, this.action(this.handle_api_tags))
+    app.post(`${this.settings.prefix}/api/show`, this.action(this.handle_api_show))
     app.all(`${this.settings.prefix}/*`, this.action(this.handle_remaining_routes))
   }
 }

@@ -47,6 +47,9 @@ importers:
       minimatch:
         specifier: 10.0.3
         version: 10.0.3
+      ollama:
+        specifier: ^0.5.17
+        version: 0.5.17
       openai:
         specifier: 5.12.0
         version: 5.12.0
@@ -608,6 +611,9 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
+  ollama@0.5.17:
+    resolution: {integrity: sha512-q5LmPtk6GLFouS+3aURIVl+qcAOPC4+Msmx7uBb3pd+fxI55WnGjmLZ0yijI/CYy79x0QPGx3BwC3u5zv9fBvQ==}
+
   openai@5.12.0:
     resolution: {integrity: sha512-vUdt02xiWgOHiYUmW0Hj1Qu9OKAiVQu5Bd547ktVCiMKC1BkB5L3ImeEnCyq3WpRKR6ZTaPgekzqdozwdPs7Lg==}
     hasBin: true
@@ -796,6 +802,9 @@ packages:
         optional: true
       jsdom:
         optional: true
+
+  whatwg-fetch@3.6.20:
+    resolution: {integrity: sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg==}
 
   why-is-node-running@2.3.0:
     resolution: {integrity: sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==}
@@ -1204,6 +1213,10 @@ snapshots:
 
   nanoid@3.3.11: {}
 
+  ollama@0.5.17:
+    dependencies:
+      whatwg-fetch: 3.6.20
+
   openai@5.12.0: {}
 
   pathe@2.0.3: {}
@@ -1381,6 +1394,8 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  whatwg-fetch@3.6.20: {}
 
   why-is-node-running@2.3.0:
     dependencies:

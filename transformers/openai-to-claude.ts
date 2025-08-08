@@ -1,13 +1,10 @@
+import { EventSourceParserStream } from 'eventsource-parser/stream'
 import { Context } from 'hono'
+import { DumpEventSourceStream } from '../lib/DumpEventSourceStream'
+import { DumpStream } from '../lib/DumpStream'
+import { EventSourceEncoderStream } from '../lib/EventSourceEncoderStream'
 import { Hook } from '../lib/Hook'
 import * as protocols from '../protocols'
-import { Anthropic } from '@anthropic-ai/sdk/client'
-import { EventSourceEncoderStream } from '../lib/EventSourceEncoderStream'
-import { EventSourceParserStream } from 'eventsource-parser/stream'
-import { DumpStream } from '../lib/DumpStream'
-import { DumpEventSourceStream } from '../lib/DumpEventSourceStream'
-import { EventSourceMessage } from 'eventsource-parser'
-import { ChatCompletionChunk } from 'openai/resources/index'
 
 class OpenaiToClaudeHook extends Hook {
   name = 'openai-to-claude'

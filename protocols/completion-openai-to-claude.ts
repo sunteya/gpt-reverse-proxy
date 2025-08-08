@@ -183,7 +183,7 @@ export class ClaudeToOpenAIStream extends TransformStream<EventSourceMessage, Ev
       controller.terminate()
       return
     }
-    if (source.event === 'error' || json.type === 'error') {
+    if (source.event === 'error' || (json as any).type === 'error') {
       // Propagate error (maybe transform it)
       controller.enqueue(source)
       controller.terminate()
