@@ -8,5 +8,6 @@
     "skipLibCheck": true,
     "typeRoots": ["./node_modules/@types", "./typings"]
   },
-  "include": ["./**/*.ts", "./typings/**/*.d.ts"]
+  "include": ["./**/*.ts", "./typings/**/*.d.ts"],
+  "exclude": ["./node_modules", "./debug-ui"],
 }

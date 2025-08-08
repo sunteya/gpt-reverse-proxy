@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server'
+import { serveStatic } from '@hono/node-server/serve-static'
 import consola from 'consola'
 import { Hono } from 'hono'
 import * as fs from 'fs'
@@ -6,9 +7,10 @@ import * as yaml from 'js-yaml'
 import { createHandler } from './endpoints'
 import { EndpointSettings, UpstreamSettings } from './endpoints/types'
 import { HookRegistry } from './lib/HookRegistry'
-import { Dumper, generateDumpFilePath } from './lib/dumper'
+import { Dumper, generateDumpFilePath } from './lib/Dumper'
 import { UpstreamRegistry } from './lib/UpstreamRegistry'
 import path from 'path'
+import { logger } from './lib/logger'
 
 consola.level = 4
 
@@ -46,6 +48,7 @@ app.use('*', (c, next) => {
 
   return next()
 })
+app.use('*', logger())
 
 const upstreams = new UpstreamRegistry(config.upstreams, hooks)
 
@@ -60,6 +63,9 @@ for (const settings of config.endpoints) {
 
   handler.setupEndpointRoutes(app)
 }
+
+app.get('/debug', (c) => c.redirect('/debug/index.html', 307))
+app.get('/*', serveStatic({ root: path.join(root, 'public') }))
 
 const port = process.env.PORT ? parseInt(process.env.PORT) : 12000
 

@@ -38,7 +38,7 @@ class OpenaiToClaudeHook extends Hook {
 
       const eventStream = originalStream
         .pipeThrough(new TextDecoderStream())
-        .pipeThrough(new DumpStream('raw chunk', ctx.get('dumper')))
+        .pipeThrough(new DumpStream('chunk', ctx.get('dumper')))
         .pipeThrough(new EventSourceParserStream())
         .pipeThrough(new protocols.ClaudeToOpenAIStream())
         .pipeThrough(new DumpEventSourceStream('converted', ctx.get('dumper')))

@@ -4,6 +4,8 @@ import { Context } from 'hono'
 import { UpstreamSettings } from '../endpoints/types'
 import { HookRegistry } from '../lib/HookRegistry'
 import { Hook } from '../lib/Hook'
+import { Dumper } from './Dumper'
+import { dumpRequest, dumpResponse } from './logger'
 
 export class Upstream {
   settings: UpstreamSettings
@@ -41,7 +43,6 @@ export class Upstream {
     const remoteUrl = new URL(this.settings.api_base)
     const requestUrl = new URL(request.url)
 
-    const dumper = c.get('dumper')
     const targetUrl = new URL(requestUrl.pathname + requestUrl.search, remoteUrl.origin)
 
     if (remoteUrl.pathname && remoteUrl.pathname !== '/') {
@@ -56,48 +57,35 @@ export class Upstream {
       targetUrl.pathname = `${remotePath}/${incomingPath}`
     }
 
-    consola.info(`Proxying request: [${this.name}] ${c.req.method} ${c.req.path} -> ${targetUrl.toString()}`)
-
     const headers = new Headers(request.headers)
     headers.delete('host')
     headers.set('Authorization', `Bearer ${this.settings.api_key}`)
-    const body = await c.req.raw.clone().text()
 
-    dumper?.dump('request', {
+    const finalRequest = new Request(targetUrl.toString(), {
       method: request.method,
-      url: request.url,
-      headers: Object.fromEntries(headers.entries()),
-      body: body
+      headers,
+      body: request.body,
     })
+
+    const dumper = c.get('dumper') as Dumper | null
+    const requestToFetch = dumper ? dumpRequest(dumper, 'upstream', finalRequest) : finalRequest
+
+    consola.info(`Proxying request: [${this.name}] ${c.req.method} ${c.req.path} -> ${targetUrl.toString()}`)
 
     const agent = this.settings.https_proxy ? new ProxyAgent(this.settings.https_proxy) : undefined
     const dispatcher = agent ? { dispatcher: agent } : {}
 
-    let rawResponse: Response
-
-    if ([ 'GET', 'HEAD' ].includes(request.method)) {
-      rawResponse = await fetch(targetUrl.toString(), {
-        method: request.method,
-        headers: headers,
-        // @ts-ignore
-        duplex: 'half',
-        ...dispatcher,
-      })
-    } else {
-      rawResponse = await fetch(targetUrl.toString(), {
-        method: request.method,
-        headers: headers,
-        body: body,
-        // @ts-ignore
-        duplex: 'half',
-        ...dispatcher,
-      })
-    }
-
+    const rawResponse = await fetch(requestToFetch, {
+      // @ts-ignore
+      duplex: 'half',
+      ...dispatcher,
+    })
 
     consola.info(`Response received: ${rawResponse.status} ${rawResponse.statusText}`)
 
-    const response = await this.hookResponse(rawResponse, rawRequest, c)
+    const responseToHook = dumper ? dumpResponse(dumper, 'upstream', rawResponse) : rawResponse
+
+    const response = await this.hookResponse(responseToHook, rawRequest, c)
     return response
   }
 }

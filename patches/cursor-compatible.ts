@@ -43,7 +43,7 @@ class FinishReasonCleanerStream extends TransformStream<string, string> {
     }
   }
 
-  private flush(controller: TransformStreamDefaultController<string>) {
+  flush(controller: TransformStreamDefaultController<string>) {
     if (this.buffer) {
       controller.enqueue(this.buffer)
     }

@@ -2,10 +2,12 @@
 /.env*.local
 /.specstory/
 /log/
+
+
 /.cursorindexingignore
 __pycache__
 /litellm_config.yaml
-/debug/
 /.vscode/
 /.claude/
 /config.yml
+/public/debug/
