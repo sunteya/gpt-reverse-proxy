@@ -8,6 +8,8 @@ import { UpstreamNotFoundError } from '../lib/errors'
 import consola from 'consola'
 import { HookRegistry } from '../lib/HookRegistry'
 import { Hook } from '../lib/Hook'
+import { EndpointEnv } from '../lib/EndpointEnv'
+import { Dumper, dumpRequest, dumpResponse, generateDumpFilePath } from '../lib/Dumper'
 
 export abstract class BaseEndpointHandler implements EndpointHandler {
   settings: EndpointSettings
@@ -21,35 +23,16 @@ export abstract class BaseEndpointHandler implements EndpointHandler {
     this.hooks = hookRegistry.getHooks(settings.plugins ?? [])
   }
 
-  async hookRequest(request: Request, ctx: Context): Promise<Request> {
-    let modifiedRequest = request
-    for (const hook of this.hooks) {
-      modifiedRequest = await hook.onRequest(modifiedRequest, ctx)
-    }
-
-    return modifiedRequest
-  }
-
-  async hookResponse(response: Response, request: Request, ctx: Context): Promise<Response> {
-    let modifiedResponse = response
-    for (const hook of this.hooks.reverse()) {
-      modifiedResponse = await hook.onResponse(modifiedResponse, request, ctx)
-    }
-    
-    return modifiedResponse
-  }
-
-  buildStrippedRequest(ctx: Context): Request {
+  buildStrippedRequest(rawRequest: Request): Request {
     if (!this.settings.prefix) {
-      return ctx.req.raw.clone()
+      return rawRequest.clone()
     }
 
-    const strippedPath = utils.stripPrefix(ctx.req.path, this.settings.prefix)
-    const originalRequest = ctx.req.raw.clone()
-    const originalUrl = new URL(originalRequest.url)
-    
+    const originalUrl = new URL(rawRequest.url)
+    const strippedPath = utils.stripPrefix(originalUrl.pathname, this.settings.prefix)
     const modifiedUrl = new URL(strippedPath + originalUrl.search, originalUrl.origin)
 
+    const originalRequest = rawRequest.clone()
     return new Request(modifiedUrl.toString(), {
       method: originalRequest.method,
       headers: originalRequest.headers,
@@ -57,32 +40,39 @@ export abstract class BaseEndpointHandler implements EndpointHandler {
     })
   }
 
-  async handleProxyRequest(request: Request, ctx: Context, next: Next, upstream: Upstream) {
-    const modifiedRequest = await this.hookRequest(request, ctx)
-    const response = await upstream.handle(modifiedRequest, ctx)
-    return await this.hookResponse(response, modifiedRequest, ctx)
-  }
+  action(callback: (request: Request, env: EndpointEnv) => Promise<Response>) {
+    return async (ctx: Context) => {
+      const dumpFilePath = generateDumpFilePath(ctx.req.path)
+      consola.info(`Dumping to ${dumpFilePath}`)
+      const dumper = new Dumper(dumpFilePath)
 
-  action(callback: (request: Request, ctx: Context, next: Next) => Promise<Response>) {
-    return async (c: Context, next: Next) => {
       try {
-        const request = this.buildStrippedRequest(c)
-        return await callback.call(this, request, c, next)
+        const rawRequest = dumpRequest(dumper, 'user', ctx.req.raw)
+        const request = this.buildStrippedRequest(rawRequest)
+
+        const env = {
+          dumper,
+          originalRequest: request,
+          prefix: this.settings.prefix
+        } satisfies EndpointEnv
+
+        const response = await callback.call(this, request, env)
+        return dumpResponse(dumper, 'user', response)
       } catch (error) {
         consola.error(error)
 
         if (error instanceof UpstreamNotFoundError) {
-          return c.text(error.message, 503)
+          return dumpResponse(dumper, 'user', new Response(error.message, { status: 503 }))
         }
 
-        return c.text('Internal Server Error', 500)
+        return dumpResponse(dumper, 'user', new Response('Internal Server Error', { status: 500 }))
       }
     }
   }
 
-  async handle_remaining_routes(request: Request, ctx: Context, next: Next) {
+  async handle_remaining_routes(request: Request, env: EndpointEnv) {
     const upstream = this.upstreams.find({ protocol: this.settings.type, model: null })
-    return this.handleProxyRequest(request, ctx, next, upstream)
+    return upstream.handle(request, env, this.hooks)
   }
 
   abstract setupEndpointRoutes(app: Hono): void

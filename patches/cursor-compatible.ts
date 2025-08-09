@@ -1,6 +1,7 @@
 import { Context } from 'hono'
+import { EndpointEnv } from '../lib/EndpointEnv'
 import { DumpStream } from '../lib/DumpStream'
-import { Hook } from '../lib/Hook'
+import { Hook, HookRequestContext } from '../lib/Hook'
 
 class FinishReasonCleanerStream extends TransformStream<string, string> {
   buffer = ''
@@ -53,38 +54,14 @@ class FinishReasonCleanerStream extends TransformStream<string, string> {
 class CursorCompatibleHook extends Hook {
   name = 'cursor-compatible'
 
-  handle_chat_completions_response(response: Response, request: Request, ctx: Context) {
-    if (!this.isStreamingResponse(response)) {
-      return response
-    }
-
-    const originalStream = response.body
-    if (!originalStream) {
-      return response
-    }
-
-    const eventStream = originalStream.pipeThrough(new TextDecoderStream())
-                                      .pipeThrough(new DumpStream('raw chunk', ctx.get('dumper')))
-                                      .pipeThrough(new FinishReasonCleanerStream())
-                                      // .pipeThrough(new EventSourceParserStream())
-                                      // .pipeThrough(new DumpEventSourceStream('converted', ctx.get('dumper')))
-                                      // .pipeThrough(new EventSourceEncoderStream())
-                                      .pipeThrough(new DumpStream('converted', ctx.get('dumper')))
-                                      .pipeThrough(new TextEncoderStream())
-
-    return new Response(eventStream, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers
-    })
-  }
-
-  async onResponse(response: Response, request: Request, ctx: Context): Promise<Response> {
+  async onRequest(request: Request, env: EndpointEnv, ctx: HookRequestContext) {
     if (request.url.includes('/v1/chat/completions')) {
-      return this.handle_chat_completions_response(response, request, ctx)
+      ctx.addResponse((resp) => {
+        return this.isStreamingResponse(resp) ? this.convert_stream_chunk_response(resp, new FinishReasonCleanerStream()) : resp
+      })
     }
 
-    return response
+    return request
   }
 }
 

@@ -36,7 +36,9 @@ export class UpstreamRegistry {
 
   matchSettings(conds: FindUpstreamConds): UpstreamSettings[] {
     consola.info(`Matching settings for: ${JSON.stringify(conds)}`)
-    const availableSettings = this.config.filter(settings => this.isMatchProtocol(settings, conds.protocol) && this.isMatchModel(settings, conds.model))
+    const availableSettings = this.config.filter(settings => {
+      return this.isMatchProtocol(settings, conds.protocol) && this.isMatchModel(settings, conds.model)
+    })
     consola.info(`Found ${availableSettings.length} settings for: ${JSON.stringify(conds)}`)
     return availableSettings
   }

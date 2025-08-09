@@ -19,49 +19,43 @@ cd gpt-reverse-proxy
 2. Create `config.yml` (example)
 ```yaml
 endpoints:
-  - prefix: /cursor
+  - prefix: /cursor # recommend add a random string for secret
     type: openai
     plugins:
-      - patches/cursor-compatible
+      - patches/cursor-compatible # fixes cursor compatibility issues
 
-  - prefix: /vscode
-    type: ollama
-
-  - prefix: /claude
-    type: claude
+  # - prefix: /any/path
+  #   type: ollama # openai, ollama, claude
 
 upstreams:
-  # OpenAI-compatible upstream(s)
-  - name: openai-any
-    protocols: [openai]
+  - name: anything
+    protocols: # matches endpoint type
+      - openai
+      # - ollama
     api_base: https://<your-openai-like-host>
-    api_key: <your-api-key>
+    # api_key: <your-api-key> # overrides request authorization if set
 
-  # Use OpenAI client against a Claude backend (auto convert request/response)
-  - name: claude-via-openai
-    protocols: [openai]
-    models: ["claude-*"]
+  - name: openai-to-claude
+    protocols:
+      - openai
+      - claude
+    models:
+      - claude-* # only this model
     plugins:
-      - transformers/openai-to-claude
+      - transformers/openai-to-claude # convert OpenAI to Claude
+      # - patches/simulate-claude-code-client # simulate Claude Code client
     api_base: https://<your-claude-host>
     api_key: <your-claude-key>
 
-  # Native Claude client usage
-  - name: claude-native
-    protocols: [claude]
-    plugins:
-      - patches/simulate-claude-code-client
-    models: ["claude-*"]
-    api_base: https://<your-claude-host>
-    api_key: <your-claude-key>
-
-  # Make Ollama tags/show talk to an OpenAI-compatible backend
-  - name: ollama-compat
-    protocols: [ollama]
-    plugins:
-      - transformers/ollama-to-openai
-    api_base: https://<your-openai-like-host>
-    api_key: <your-api-key>
+  # - name: ollama-to-openai-to-claude
+  #   protocols:
+  #     - ollama
+  #     - openai
+  #   plugins:
+  #     - transformers/ollama-to-openai
+  #     - transformers/openai-to-claude
+  #   api_base: https://<your-openai-like-host>
+  #   api_key: <your-api-key>
 ```
 
 3. Run locally

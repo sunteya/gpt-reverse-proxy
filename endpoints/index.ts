@@ -16,5 +16,6 @@ export function createHandler(type: string, settings: EndpointSettings, upstream
   if (!HandlerClass) {
     return undefined
   }
+
   return new HandlerClass(settings, upstreams, hooks)
 }

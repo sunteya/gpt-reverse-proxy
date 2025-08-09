@@ -4,7 +4,7 @@ import dayjs from 'dayjs'
 
 export type OllamaTag = Partial<RawOllamaTag>
 
-export function openaiModelsResponseToOllama(json: { object: string; data: OpenAIModel[] }) {
+export function openaiModelsResponseToOllama(json: { data: OpenAIModel[] }) {
   const models: OllamaTag[] = json.data.map((m: OpenAIModel) => {
     return {
       name: m.id,

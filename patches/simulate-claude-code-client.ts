@@ -1,12 +1,11 @@
 import { MessageCreateParamsBase as ClaudeCompletionParams, TextBlockParam as ClaudeTextBlockParam } from '@anthropic-ai/sdk/resources/messages'
-import consola from 'consola'
-import { Context, Hono, Next } from 'hono'
+import { EndpointEnv } from '../lib/EndpointEnv'
 import { Hook } from '../lib/Hook'
 
 export class SimulateClaudeCodeClientHook extends Hook {
   name = 'simulate-claude-code-client'
 
-  async on_messages_request(request: Request, ctx: Context) {
+  async on_messages_request(request: Request, env: EndpointEnv) {
     const body = await request.json() as ClaudeCompletionParams
     const system = (typeof body.system == 'string')
       ? [ { text: body.system, type: 'text' } satisfies ClaudeTextBlockParam ]
@@ -44,15 +43,11 @@ export class SimulateClaudeCodeClientHook extends Hook {
     })
   }
 
-  isMessageRequest(request: Request) {
-    return request.url.includes('/v1/messages')
-  }
-
-  async onRequest(request: Request, ctx: Context) {
+  async onRequest(request: Request, env: EndpointEnv) {
     const newRequest = this.simulateClaudeRequest(request)
 
-    if (this.isMessageRequest(request)) {
-      return this.on_messages_request(newRequest, ctx)
+    if (request.url.includes('/v1/messages')) {
+      return this.on_messages_request(newRequest, env)
     }
 
     return newRequest

@@ -2,8 +2,7 @@ import type { LogEntry } from '~/models/LogEntry'
 
 export async function fetchLog(logPath: string): Promise<LogEntry[]> {
   try {
-    const baseUrl = import.meta.env.BASE_URL
-    const response = await fetch(`${baseUrl}${logPath}`)
+    const response = await fetch(logPath)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }

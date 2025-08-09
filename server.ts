@@ -7,10 +7,8 @@ import * as yaml from 'js-yaml'
 import { createHandler } from './endpoints'
 import { EndpointSettings, UpstreamSettings } from './endpoints/types'
 import { HookRegistry } from './lib/HookRegistry'
-import { Dumper, generateDumpFilePath } from './lib/Dumper'
 import { UpstreamRegistry } from './lib/UpstreamRegistry'
 import path from 'path'
-import { logger } from './lib/logger'
 
 consola.level = 4
 
@@ -33,24 +31,14 @@ const config = loadConfig()
 consola.info(`Loaded ${config.endpoints.length} endpoints from config.yml`)
 
 const root = process.cwd()
+
 const hooks = new HookRegistry()
 await hooks.loadFromDirectory(root, 'patches')
 await hooks.loadFromDirectory(root, 'transformers')
 
-const app = new Hono()
-app.use('*', (c, next) => {
-  consola.info(`url: ${c.req.method} ${c.req.url}`)
-
-  const dumpFilePath = generateDumpFilePath(c.req.path)
-  consola.info(`Dumping to ${dumpFilePath}`)
-  const dumper = new Dumper(dumpFilePath)
-  c.set('dumper', dumper)
-
-  return next()
-})
-app.use('*', logger())
-
 const upstreams = new UpstreamRegistry(config.upstreams, hooks)
+
+const app = new Hono()
 
 for (const settings of config.endpoints) {
   consola.info(`Setting up ${settings.type} routes for ${settings.prefix}`)
