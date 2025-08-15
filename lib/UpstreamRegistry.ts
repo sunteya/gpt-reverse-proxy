@@ -4,20 +4,19 @@ import { Upstream } from './Upstream'
 import { HookRegistry } from './HookRegistry'
 import { minimatch } from 'minimatch'
 import consola from 'consola'
+import { Breaker } from './Breaker'
 
-export type FindUpstreamConds = {
-  group?: string
-  model?: string | null
-  protocol?: string | null
-}
+export type FindUpstreamConds = { model?: string | null; protocol?: string | null }
 
 export class UpstreamRegistry {
   config: UpstreamSettings[]
   hookRegistry: HookRegistry
+  breaker: Breaker
 
   constructor(config: UpstreamSettings[], hookRegistry: HookRegistry) {
     this.config = config
     this.hookRegistry = hookRegistry
+    this.breaker = new Breaker()
   }
 
   find(conds: FindUpstreamConds): Upstream {
@@ -36,11 +35,11 @@ export class UpstreamRegistry {
 
   matchSettings(conds: FindUpstreamConds): UpstreamSettings[] {
     consola.info(`Matching settings for: ${JSON.stringify(conds)}`)
-    const availableSettings = this.config.filter(settings => {
-      return this.isMatchProtocol(settings, conds.protocol) && this.isMatchModel(settings, conds.model)
-    })
-    consola.info(`Found ${availableSettings.length} settings for: ${JSON.stringify(conds)}`)
-    return availableSettings
+    const matches = this.config.filter(settings => this.isMatchProtocol(settings, conds.protocol) && this.isMatchModel(settings, conds.model))
+    const healthy = matches.filter(s => !this.breaker.isOpen(s.name))
+    const list = healthy.length ? healthy : (matches.length ? [matches.slice().sort((a, b) => this.breaker.openUntil(a.name) - this.breaker.openUntil(b.name))[0]] : [])
+    consola.info(`Found ${list.length} settings for: ${JSON.stringify(conds)}`)
+    return list
   }
 
   isMatchProtocol(settings: UpstreamSettings, protocol: string | undefined | null) {

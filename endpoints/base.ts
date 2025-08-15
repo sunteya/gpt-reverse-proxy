@@ -10,17 +10,20 @@ import { HookRegistry } from '../lib/HookRegistry'
 import { Hook } from '../lib/Hook'
 import { EndpointEnv } from '../lib/EndpointEnv'
 import { Dumper, dumpRequest, dumpResponse, generateDumpFilePath } from '../lib/Dumper'
+import { LoadBalancer } from '../lib/LoadBalancer'
 
 export abstract class BaseEndpointHandler implements EndpointHandler {
   settings: EndpointSettings
   upstreams: UpstreamRegistry
   hooks: Hook[]
+  balancer: LoadBalancer
 
   constructor(settings: EndpointSettings, upstreams: UpstreamRegistry, hookRegistry: HookRegistry) {
     this.settings = settings
     this.upstreams = upstreams
 
     this.hooks = hookRegistry.getHooks(settings.plugins ?? [])
+    this.balancer = new LoadBalancer(this.hooks)
   }
 
   buildStrippedRequest(rawRequest: Request): Request {
@@ -53,7 +56,8 @@ export abstract class BaseEndpointHandler implements EndpointHandler {
         const env = {
           dumper,
           originalRequest: request,
-          prefix: this.settings.prefix
+          prefix: this.settings.prefix,
+          breaker: this.upstreams.breaker,
         } satisfies EndpointEnv
 
         const response = await callback.call(this, request, env)
@@ -71,8 +75,8 @@ export abstract class BaseEndpointHandler implements EndpointHandler {
   }
 
   async handle_remaining_routes(request: Request, env: EndpointEnv) {
-    const upstream = this.upstreams.find({ protocol: this.settings.type, model: null })
-    return upstream.handle(request, env, this.hooks)
+    const candidates = this.upstreams.findAll({ protocol: this.settings.type, model: null })
+    return this.balancer.forward(candidates, request, env)
   }
 
   abstract setupEndpointRoutes(app: Hono): void

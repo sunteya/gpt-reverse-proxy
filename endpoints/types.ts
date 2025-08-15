@@ -1,5 +1,15 @@
 import { Hono } from 'hono'
 
+export interface RetrySettings {
+  max_attempts?: number
+  backoff_ms?: number
+  retry_on_status?: (number | '5xx')[]
+}
+
+export interface BreakerSettings {
+  cooldown_ms?: number
+}
+
 export interface UpstreamSettings {
   name: string
   protocols: string[] | undefined
@@ -9,6 +19,9 @@ export interface UpstreamSettings {
 
   plugins?: string[]
   models?: string[]
+  priority?: number
+  retry?: RetrySettings
+  breaker?: BreakerSettings
 }
 
 export interface EndpointSettings {

@@ -46,8 +46,8 @@ export class OllamaHandler extends BaseEndpointHandler {
     const req = request.clone()
     const json = await req.json()
     const model = String(json?.model)
-    const upstream = this.upstreams.find({ model, protocol: this.settings.type })
-    return upstream.handle(request, env, this.hooks)
+    const candidates = this.upstreams.findAll({ protocol: this.settings.type, model })
+    return this.balancer.forward(candidates, request, env)
   }
 
   setupEndpointRoutes(app: Hono): void {
