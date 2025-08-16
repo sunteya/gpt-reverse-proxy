@@ -88,14 +88,14 @@ services:
 
 - `endpoints[]` (inbound endpoints):
   - `prefix`: base path, e.g. `/cursor`
-  - `type`: `openai` | `claude` | `ollama`
+  - `type`: `openai` | `claude` | `ollama` | `debug`
   - `plugins?`: hook names to run for this endpoint
   - Tip: you can set `prefix` to a random, non-guessable string for lightweight access control, e.g. `/ollama-ig5iecaetiechiequee6`
 
 - `upstreams[]` (target services):
   - `name`: label for logs only
   - `protocols?`: which endpoint types this upstream accepts; if omitted, no restriction
-  - `models?`: optional model glob patterns, e.g. `"claude-*"`
+  - `models?`: optional model glob patterns, e.g. "claude-*"
   - `api_base`: upstream base URL
   - `api_key`: bearer token injected when proxying upstream
   - `https_proxy?`: proxy URL for upstream fetch (per-upstream)
@@ -118,20 +118,26 @@ Plugins are discovered from `patches/` and `transformers/` by filename at startu
 ```bash
 cd debug-ui
 pnpm install
-pnpm build # outputs to ../public/debug/
+pnpm build
+cd ..
 ```
 
-2) Make a request through the proxy; the server writes logs to `public/log/...` in JSONL:
-- A new file is created per request at a path derived from the URL. For example, hitting `/cursor/v1/chat/completions` creates something like `public/log/cursor/v1/chat/completions/<timestamp>.jsonl`.
+2) Configure a `debug` endpoint in `config.yml` (choose any prefix you like):
+```yaml
+endpoints:
+  - prefix: /debug
+    type: debug
+```
+
+3) Usage
+- `<prefix>/` serves the built UI from `debug-ui/dist`
+- `<prefix>/log/*` serves files from the project `log/` directory
+
+4) Logs
+- The server writes logs to `log/...` in JSONL.
+- A new file is created per request at a path derived from the URL. For example, hitting `/cursor/v1/chat/completions` creates something like `log/cursor/v1/chat/completions/<timestamp>.jsonl`.
 - Each line is a JSON object with fields like `timestamp`, `leg` (user|upstream), `direction` (request|response), `event` (info|body|chunk), and `payload`.
 
-3) Open the debug UI in your browser:
-- `https://<your-host>/debug/` shows the viewer
-- Deep-link to a specific log file via query, e.g. `https://<your-host>/debug/?log/cursor/v1/chat/completions/20250808055844815.jsonl`
-
-Notes:
-- Port is controlled by `PORT` (default `12000`).
-- Static files are served from `public/`.
 
 ### Security
 
@@ -148,7 +154,7 @@ pnpm tsx server.ts
 
 - Create custom hooks under `patches/` or `transformers/` and export a subclass of `Hook`
 - Types: see `endpoints/types.ts`
-- Static assets are served from `public/`; the debug UI lives at `/debug`
+- Static assets are served from `public/`; the debug UI is served via your configured `debug` endpoint
 
 ### License
 

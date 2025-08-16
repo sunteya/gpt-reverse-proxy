@@ -4,6 +4,8 @@ import { EventSourceEncoderStream } from '../lib/EventSourceEncoderStream'
 import { Hook, HookRequestContext } from '../lib/Hook'
 import * as protocols from '../protocols'
 import { EventSourceMessage } from 'eventsource-parser'
+import { OPENAI_CHAT_COMPLETIONS_PATH } from '../protocols'
+import { CLAUDE_MESSAGES_PATH } from '../protocols'
 
 class OpenaiToClaudeHook extends Hook {
   name = 'openai-to-claude'
@@ -20,7 +22,7 @@ class OpenaiToClaudeHook extends Hook {
     const json = await request.clone().json()
     const newJson = protocols.openaiCompletionRequestToClaude(json)
 
-    const newUrl = request.url.replace('/v1/chat/completions', '/v1/messages')
+    const newUrl = request.url.replace(OPENAI_CHAT_COMPLETIONS_PATH, CLAUDE_MESSAGES_PATH)
 
     return new Request(newUrl, {
       method: request.method,
@@ -30,7 +32,7 @@ class OpenaiToClaudeHook extends Hook {
   }
 
   async onRequest(request: Request, env: EndpointEnv, ctx: HookRequestContext) {
-    if (request.method === 'POST' && request.url.includes('/v1/chat/completions')) {
+    if (request.method === 'POST' && request.url.includes(OPENAI_CHAT_COMPLETIONS_PATH)) {
       return this.on_chat_completions_request(request, env, ctx)
     }
 

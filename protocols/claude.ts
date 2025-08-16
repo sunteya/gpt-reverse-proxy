@@ -1,0 +1,1 @@
+export const CLAUDE_MESSAGES_PATH = "/v1/messages"

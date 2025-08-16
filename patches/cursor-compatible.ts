@@ -2,6 +2,7 @@ import { Context } from 'hono'
 import { EndpointEnv } from '../lib/EndpointEnv'
 import { DumpStream } from '../lib/DumpStream'
 import { Hook, HookRequestContext } from '../lib/Hook'
+import { OPENAI_CHAT_COMPLETIONS_PATH } from '../protocols'
 
 class FinishReasonCleanerStream extends TransformStream<string, string> {
   buffer = ''
@@ -55,7 +56,7 @@ class CursorCompatibleHook extends Hook {
   name = 'cursor-compatible'
 
   async onRequest(request: Request, env: EndpointEnv, ctx: HookRequestContext) {
-    if (request.url.includes('/v1/chat/completions')) {
+    if (request.url.includes(OPENAI_CHAT_COMPLETIONS_PATH)) {
       ctx.addResponse((resp) => {
         return this.isStreamingResponse(resp) ? this.convert_stream_chunk_response(resp, new FinishReasonCleanerStream()) : resp
       })

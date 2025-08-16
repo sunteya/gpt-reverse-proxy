@@ -15,9 +15,7 @@ const responseLogs = computed(() => allLogLines.value.filter(item => item.direct
 const rawLogPath = window.location.search.substring(1)
 if (rawLogPath) {
   const decoded = decodeURIComponent(rawLogPath)
-  const isUrl = decoded.includes('://')
-  const normalized = isUrl ? decoded : (decoded.startsWith('/') ? decoded : `/${decoded}`)
-  logPath.value = normalized
+  logPath.value = decoded
   try {
     allLogLines.value = await fetchLog(logPath.value)
   } catch (e: any) {

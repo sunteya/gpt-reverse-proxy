@@ -10,15 +10,18 @@ export interface BreakerSettings {
   cooldown_ms?: number
 }
 
+export type UpstreamProtocol = 'ollama' | 'openai' | 'claude'
+
 export interface UpstreamSettings {
   name: string
-  protocols: string[] | undefined
+  protocols: UpstreamProtocol[] | undefined
   api_base: string
   api_key?: string
   https_proxy?: string | null
 
   plugins?: string[]
   models?: string[]
+  model_aliases?: Record<string, string> | null
   priority?: number
   retry?: RetrySettings
   breaker?: BreakerSettings

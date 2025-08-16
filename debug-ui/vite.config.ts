@@ -26,8 +26,8 @@ export default defineConfig({
   },
 
   server: { fs: { allow: [process.cwd(), LOG_DIR] } },
-  base: '/debug/',
+  base: './',
   build: {
-    outDir: '../public/debug/'
+    outDir: './dist/'
   }
 })

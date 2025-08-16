@@ -2,6 +2,7 @@ import consola from 'consola'
 import { Hono } from 'hono'
 import { BaseEndpointHandler } from './base'
 import { EndpointEnv } from '../lib/EndpointEnv'
+import { OPENAI_CHAT_COMPLETIONS_PATH } from '../protocols'
 
 export class OpenAIHandler extends BaseEndpointHandler {
   async handle_chat_completions(request: Request, env: EndpointEnv) {
@@ -14,7 +15,7 @@ export class OpenAIHandler extends BaseEndpointHandler {
 
   setupEndpointRoutes(app: Hono): void {
     const routers = new Hono()
-    routers.post('/v1/chat/completions', this.action(this.handle_chat_completions))
+    routers.post(OPENAI_CHAT_COMPLETIONS_PATH, this.action(this.handle_chat_completions))
     routers.all('*', this.action(this.handle_remaining_routes))
     app.route(this.settings.prefix || '', routers)
   }

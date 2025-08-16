@@ -2,6 +2,7 @@ import consola from 'consola'
 import { Hono } from 'hono'
 import { BaseEndpointHandler } from './base'
 import { EndpointEnv } from '../lib/EndpointEnv'
+import { OPENAI_CHAT_COMPLETIONS_PATH } from '../protocols'
 
 export class OllamaHandler extends BaseEndpointHandler {
   async handle_api_tags(request: Request, env: EndpointEnv) {
@@ -55,7 +56,7 @@ export class OllamaHandler extends BaseEndpointHandler {
     routers.get('/api/tags', this.action(this.handle_api_tags))
     routers.post('/api/show', this.action(this.handle_api_show))
     routers.get('/api/version', this.action(this.handle_api_version))
-    routers.post('/v1/chat/completions', this.action(this.handle_chat_completions))
+    routers.post(OPENAI_CHAT_COMPLETIONS_PATH, this.action(this.handle_chat_completions))
     routers.all('*', this.action(this.handle_remaining_routes))
     app.route(this.settings.prefix || '', routers)
   }

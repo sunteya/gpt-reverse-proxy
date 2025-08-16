@@ -3,6 +3,7 @@ import consola from 'consola'
 import { Hono } from 'hono'
 import { BaseEndpointHandler } from './base'
 import { EndpointEnv } from '../lib/EndpointEnv'
+import { CLAUDE_MESSAGES_PATH } from '../protocols'
 
 export class ClaudeHandler extends BaseEndpointHandler {
   async handle_messages(request: Request, env: EndpointEnv) {
@@ -15,7 +16,7 @@ export class ClaudeHandler extends BaseEndpointHandler {
 
   setupEndpointRoutes(app: Hono): void {
     const routers = new Hono()
-    routers.post('/v1/messages', this.action(this.handle_messages))
+    routers.post(CLAUDE_MESSAGES_PATH, this.action(this.handle_messages))
     routers.all('*', this.action(this.handle_remaining_routes))
     app.route(this.settings.prefix || '', routers)
   }

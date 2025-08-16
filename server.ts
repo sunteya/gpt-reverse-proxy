@@ -1,5 +1,4 @@
 import { serve } from '@hono/node-server'
-import { serveStatic } from '@hono/node-server/serve-static'
 import consola from 'consola'
 import { Hono } from 'hono'
 import * as fs from 'fs'
@@ -9,6 +8,7 @@ import { EndpointSettings, UpstreamSettings } from './endpoints/types'
 import { HookRegistry } from './lib/HookRegistry'
 import { UpstreamRegistry } from './lib/UpstreamRegistry'
 import path from 'path'
+import { serveStatic } from '@hono/node-server/serve-static'
 
 consola.level = 4
 
@@ -52,7 +52,6 @@ for (const settings of config.endpoints) {
   handler.setupEndpointRoutes(app)
 }
 
-app.get('/debug', (c) => c.redirect('/debug/index.html', 307))
 app.get('/*', serveStatic({ root: path.join(root, 'public') }))
 
 const port = process.env.PORT ? parseInt(process.env.PORT) : 12000
