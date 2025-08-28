@@ -38,16 +38,15 @@ export abstract class Hook {
     })
   }
 
-  convert_stream_chunk_response(response: Response, converter: TransformStream<string, string>) {
+  convert_stream_chunk_response(response: Response, callback: (stream: ReadableStream<string>) => ReadableStream<string>) {
     const originalStream = response.body
     if (!originalStream) {
       return response
     }
 
-    const eventStream = originalStream
-      .pipeThrough(new TextDecoderStream())
-      .pipeThrough(converter)
-      .pipeThrough(new TextEncoderStream())
+    const eventStream = callback(
+      originalStream.pipeThrough(new TextDecoderStream())
+    ).pipeThrough(new TextEncoderStream())
 
     return new Response(eventStream, {
       status: response.status,

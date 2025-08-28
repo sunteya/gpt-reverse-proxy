@@ -84,6 +84,9 @@ importers:
       vite:
         specifier: 7.1.0
         version: 7.1.0(@types/node@24.2.0)(tsx@4.20.3)
+      vite-tsconfig-paths:
+        specifier: ^5.1.4
+        version: 5.1.4(typescript@5.9.2)(vite@7.1.0(@types/node@24.2.0)(tsx@4.20.3))
       vitest:
         specifier: 3.2.4
         version: 3.2.4(@types/node@24.2.0)(@vitest/ui@3.2.4)(tsx@4.20.3)
@@ -543,6 +546,9 @@ packages:
   get-tsconfig@4.10.1:
     resolution: {integrity: sha512-auHyJ4AgMz7vgS8Hp3N6HXSmlMdUyhSUrfBF16w153rxtLIEOE+HGqaBppczZvnHLqQJfiHotCYpNhl0lUROFQ==}
 
+  globrex@0.1.2:
+    resolution: {integrity: sha512-uHJgbwAMwNFf5mLst7IWLNg14x1CkeqglJb/K3doi4dw6q2IvAAmM/Y81kevy83wP+Sst+nutFTYOGg3d1lsxg==}
+
   hono@4.8.12:
     resolution: {integrity: sha512-MQSKk1Mg7b74k8l+A025LfysnLtXDKkE4pLaSsYRQC5iy85lgZnuyeQ1Wynair9mmECzoLu+FtJtqNZSoogBDQ==}
     engines: {node: '>=16.9.0'}
@@ -709,6 +715,16 @@ packages:
     resolution: {integrity: sha512-sf4i37nQ2LBx4m3wB74y+ubopq6W/dIzXg0FDGjsYnZHVa1Da8FH853wlL2gtUhg+xJXjfk3kUZS3BRoQeoQBQ==}
     engines: {node: '>=6'}
 
+  tsconfck@3.1.6:
+    resolution: {integrity: sha512-ks6Vjr/jEw0P1gmOVwutM3B7fWxoWBL2KRDb1JfqGVawBmO5UsvmWOQFGHBPl5yxYz4eERr19E6L7NMv+Fej4w==}
+    engines: {node: ^18 || >=20}
+    hasBin: true
+    peerDependencies:
+      typescript: ^5.0.0
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   tsx@4.20.3:
     resolution: {integrity: sha512-qjbnuR9Tr+FJOMBqJCW5ehvIo/buZq7vH7qD7JziU98h6l3qGy0a/yPFjwO+y0/T7GFpNgNAvEcPPVfyT8rrPQ==}
     engines: {node: '>=18.0.0'}
@@ -734,6 +750,14 @@ packages:
     resolution: {integrity: sha512-EbKSKh+bh1E1IFxeO0pg1n4dvoOTt0UDiXMd/qn++r98+jPO1xtJilvXldeuQ8giIB5IkpjCgMleHMNEsGH6pg==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
+
+  vite-tsconfig-paths@5.1.4:
+    resolution: {integrity: sha512-cYj0LRuLV2c2sMqhqhGpaO3LretdtMn/BVX4cPLanIZuwwrkVl+lK84E/miEXkCHWXuq65rhNN4rXsBcOB3S4w==}
+    peerDependencies:
+      vite: '*'
+    peerDependenciesMeta:
+      vite:
+        optional: true
 
   vite@7.1.0:
     resolution: {integrity: sha512-3jdAy3NhBJYsa/lCFcnRfbK4kNkO/bhijFCnv5ByUQk/eekYagoV2yQSISUrhpV+5JiY5hmwOh7jNnQ68dFMuQ==}
@@ -1146,6 +1170,8 @@ snapshots:
     dependencies:
       resolve-pkg-maps: 1.0.0
 
+  globrex@0.1.2: {}
+
   hono@4.8.12: {}
 
   http-proxy-middleware@3.0.5:
@@ -1304,6 +1330,10 @@ snapshots:
 
   totalist@3.0.1: {}
 
+  tsconfck@3.1.6(typescript@5.9.2):
+    optionalDependencies:
+      typescript: 5.9.2
+
   tsx@4.20.3:
     dependencies:
       esbuild: 0.25.8
@@ -1339,6 +1369,17 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  vite-tsconfig-paths@5.1.4(typescript@5.9.2)(vite@7.1.0(@types/node@24.2.0)(tsx@4.20.3)):
+    dependencies:
+      debug: 4.4.1
+      globrex: 0.1.2
+      tsconfck: 3.1.6(typescript@5.9.2)
+    optionalDependencies:
+      vite: 7.1.0(@types/node@24.2.0)(tsx@4.20.3)
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
 
   vite@7.1.0(@types/node@24.2.0)(tsx@4.20.3):
     dependencies:

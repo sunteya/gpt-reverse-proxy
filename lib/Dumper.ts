@@ -21,6 +21,14 @@ export function generateDumpFilePath(requestPath: string): string {
   return path.join(dumpDir, `${fileTimestamp}.jsonl`)
 }
 
+export interface DumpEntry {
+  timestamp: string
+  leg: 'user' | 'upstream' | null
+  direction: 'request' | 'response'
+  event: string
+  payload: Record<string, any>
+}
+
 export class Dumper {
   filePath: string;
 
@@ -29,7 +37,7 @@ export class Dumper {
   }
 
   public dump(leg: 'user' | 'upstream' | null, direction: 'request' | 'response', event: string, payload: Record<string, any>) {
-    const dumpEntry = {
+    const dumpEntry: DumpEntry = {
       timestamp: dayjs().format('YYYY-MM-DD HH:mm:ss.SSS'),
       leg,
       direction,
@@ -65,10 +73,7 @@ function dumpBody(dumper: Dumper, leg: 'user' | 'upstream', direction: 'request'
         const { done, value } = await reader.read()
         if (done) break
         const decoded = new TextDecoder().decode(value)
-        for (const line of decoded.split('\n')) {
-          if (!line.trim()) continue
-          dumper.dump(leg, direction, 'chunk', { text: line })
-        }
+        dumper.dump(leg, direction, 'chunk', { text: decoded })
       }
     } else {
       const body = await new Response(logBody).text()

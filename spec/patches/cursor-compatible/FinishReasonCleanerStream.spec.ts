@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { FinishReasonCleanerStream } from './cursor-compatible'
+import { CombineFinishChunkStream, FinishReasonCleanerStream } from '$$/patches/cursor-compatible'
+import path from 'path'
+import fs from 'fs/promises'
+import { createParser, EventSourceMessage } from 'eventsource-parser'
+import { loadChunksFromLogFile } from '$$/spec/support/test-helpers'
 
 async function collectStream(stream: ReadableStream<string>): Promise<string[]> {
   const chunks: string[] = []
@@ -32,6 +36,45 @@ describe('FinishReasonCleanerStream', () => {
     const result = await collectStream(outputStream)
 
     expect(result.join('')).toBe('{"foo":"bar"}')
+  })
+
+  it('convert real response', async () => {
+    const inputEntries = await loadChunksFromLogFile(__dirname, "FinishReasonCleanerStream.20250828084314986.jsonl")
+
+    const inputStream = new ReadableStream<string>({
+      start(controller) {
+        inputEntries
+          .filter(it => it.leg == 'upstream' && it.direction == 'response' && it.event == 'chunk')
+          .forEach(it => controller.enqueue(it.payload.text + "\n\n"))
+        controller.close()
+      }
+    })
+
+    const subject = new FinishReasonCleanerStream()
+    const outputChucks = await collectStream(
+      inputStream.pipeThrough(subject)
+    )
+
+    const messages = [] as EventSourceMessage[]
+    const parser = createParser({
+      onEvent: (event: EventSourceMessage) => {
+        messages.push(event)
+      },
+    })
+    for (const chunk of outputChucks) {
+      parser.feed(chunk)
+    }
+
+    const finishMessages = messages.filter(message => {
+      try {
+        const json = JSON.parse(message.data)
+        return ('finish_reason' in json.choices[0])
+      } catch (e) {
+        return false
+      }
+    })
+
+    expect(finishMessages.length).toBe(1)
   })
 
   it('should remove finish_reason spanning across multiple chunks', async () => {
@@ -72,9 +115,9 @@ describe('FinishReasonCleanerStream', () => {
     const inputStream = new ReadableStream<string>({
       start(controller) {
         controller.enqueue('{"foo":"bar"')
-        controller.enqueue(',"finish_reason":') // Interception trigger
-        controller.enqueue('nul')              // Partial, but not 'null'
-        controller.enqueue('X}')                // Mismatch
+        controller.enqueue(',"finish_reason":')
+        controller.enqueue('nul')
+        controller.enqueue('X}')
         controller.close()
       }
     })
