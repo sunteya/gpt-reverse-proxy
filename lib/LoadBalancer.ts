@@ -2,6 +2,7 @@ import consola from 'consola'
 import { EndpointEnv } from './EndpointEnv'
 import { Hook } from './Hook'
 import { Upstream } from './Upstream'
+import * as utils from './utils'
 
 export type BalanceConds = { model?: string | null }
 
@@ -10,6 +11,15 @@ export class LoadBalancer {
 
   constructor(interceptors: Hook[]) {
     this.interceptors = interceptors
+  }
+
+  isRetryStatus(status: number, retryOn: (number | '5xx')[]): boolean {
+    return retryOn.some(x => {
+      if (x === '5xx') {
+        return status >= 500 && status <= 599
+      }
+      return status === x
+    })
   }
 
   async forward(candidates: Upstream[], request: Request, env: EndpointEnv): Promise<Response> {
@@ -33,8 +43,10 @@ export class LoadBalancer {
 
     const bodyBuf = request.body ? await request.clone().arrayBuffer() : undefined
     let lastErr: unknown
+    let lastRes: Response | undefined
 
-    for (const u of sorted) {
+    for (let ui = 0; ui < sorted.length; ui++) {
+      const u = sorted[ui]
       const retry = u.settings.retry ?? {}
       const attempts = Math.max(1, retry.max_attempts ?? 1)
       const backoff = Math.max(0, retry.backoff_ms ?? 0)
@@ -44,24 +56,25 @@ export class LoadBalancer {
         const attemptReq = new Request(request.url, { method: request.method, headers: request.headers, body: bodyBuf ? bodyBuf.slice(0) : undefined })
         try {
           const res = await u.handle(attemptReq, env, this.interceptors)
-          const s = res.status
-          const shouldRetry = retryOn.some(x => (x === '5xx' ? s >= 500 && s <= 599 : s === x))
-          if (!shouldRetry) {
+          if (!this.isRetryStatus(res.status, retryOn)) {
             env.breaker.markSuccess(u.settings.name)
             return res
           }
-          lastErr = new Error(`retryable status ${s} from ${u.name}`)
+
+          lastRes = res
+          lastErr = new Error(`retryable status ${res.status} from ${u.name}`)
         } catch (e) {
           lastErr = e
         }
         if (i < attempts - 1 && backoff > 0) {
-          await new Promise(resolve => setTimeout(resolve, backoff))
+          await utils.sleep(backoff)
         }
       }
 
       env.breaker.markFailure(u.settings.name, u.settings.breaker)
     }
 
+    if (lastRes) return lastRes
     consola.error(lastErr)
     return new Response('Service Unavailable', { status: 503 })
   }

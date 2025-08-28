@@ -1,4 +1,4 @@
-import { UpstreamSettings } from '../endpoints/types'
+import { UpstreamProtocol, UpstreamSettings } from '../endpoints/types'
 import { UpstreamNotFoundError } from './errors'
 import { Upstream } from './Upstream'
 import { HookRegistry } from './HookRegistry'
@@ -6,7 +6,7 @@ import { minimatch } from 'minimatch'
 import consola from 'consola'
 import { Breaker } from './Breaker'
 
-export type FindUpstreamConds = { model?: string | null; protocol?: string | null }
+export type FindUpstreamConds = { model?: string | null; protocol?: UpstreamProtocol | null }
 
 export class UpstreamRegistry {
   config: UpstreamSettings[]
@@ -42,7 +42,7 @@ export class UpstreamRegistry {
     return list
   }
 
-  isMatchProtocol(settings: UpstreamSettings, protocol: string | undefined | null) {
+  isMatchProtocol(settings: UpstreamSettings, protocol: UpstreamProtocol | undefined | null) {
     if (!protocol) { return true }
     if (!settings.protocols) { return true }
     return settings.protocols.includes(protocol)

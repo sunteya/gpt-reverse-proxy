@@ -29,7 +29,7 @@ export interface UpstreamSettings {
 
 export interface EndpointSettings {
   prefix: string
-  type: string
+  type: UpstreamProtocol
   plugins?: string[]
 }
 
