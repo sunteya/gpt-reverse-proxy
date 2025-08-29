@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { OPENAI_CHAT_COMPLETIONS_PATH } from '$$/protocols'
-import cursorCompatibleHook from '$$/patches/cursor-compatible'
+import CursorCompatibleHook from '$$/patches/cursor-compatible'
 
 describe('CursorCompatibleHook', () => {
+  const cursorCompatibleHook = new CursorCompatibleHook({})
   describe('onRequest', () => {
     it('should modify request for cursor compatibility', async () => {
       const originalBody = {

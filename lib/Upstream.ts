@@ -137,29 +137,39 @@ export class Upstream {
     const agent = this.settings.https_proxy ? new ProxyAgent(this.settings.https_proxy) : undefined
     const dispatcher = agent ? { dispatcher: agent } : {}
 
-    const rawResponse = await fetch(requestToFetch, {
-      // @ts-ignore
-      duplex: 'half',
-      ...dispatcher,
-    })
+    try {
+      const rawResponse = await fetch(requestToFetch, {
+        // @ts-ignore
+        duplex: 'half',
+        ...dispatcher,
+      })
 
-    consola.info(`Response received: ${rawResponse.status} ${rawResponse.statusText}`)
+      consola.info(`Response received: ${rawResponse.status} ${rawResponse.statusText}`)
 
-    const responseToHook = dumper ? dumpResponse(dumper, 'upstream', rawResponse) : rawResponse
-    const hooked = await runner.runResponse(responseToHook)
+      const responseToHook = dumper ? dumpResponse(dumper, 'upstream', rawResponse) : rawResponse
+      const hooked = await runner.runResponse(responseToHook)
 
-    const cleanedHeaders = new Headers(hooked.headers)
-    // const hopByHop = ['connection', 'transfer-encoding', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'upgrade']
-    // for (const h of hopByHop) {
-    //   cleanedHeaders.delete(h)
-    // }
-    cleanedHeaders.delete('content-length')
-    cleanedHeaders.delete('content-encoding')
+      const cleanedHeaders = new Headers(hooked.headers)
+      // const hopByHop = ['connection', 'transfer-encoding', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'upgrade']
+      // for (const h of hopByHop) {
+      //   cleanedHeaders.delete(h)
+      // }
+      cleanedHeaders.delete('content-length')
+      cleanedHeaders.delete('content-encoding')
 
-    return new Response(hooked.body, {
-      status: hooked.status,
-      statusText: hooked.statusText,
-      headers: cleanedHeaders,
-    })
+      return new Response(hooked.body, {
+        status: hooked.status,
+        statusText: hooked.statusText,
+        headers: cleanedHeaders,
+      })
+    } catch (e) {
+      const error = e as any
+      if (error.cause?.code === 'UND_ERR_BODY_TIMEOUT' || error.message === 'terminated') {
+        consola.error('Upstream request timed out.', error)
+        return new Response('Gateway Timeout', { status: 504 })
+      }
+      consola.error('Error fetching from upstream.', error)
+      return new Response('Bad Gateway', { status: 502 })
+    }
   }
 }

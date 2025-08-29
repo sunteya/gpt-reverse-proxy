@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import type { LogEntry } from '~/models/LogEntry'
 import { fetchLog } from '~/requests/fetchLog'
 import LogDisplay from '~/components/LogDisplay.vue'
@@ -7,7 +7,22 @@ import LogDisplay from '~/components/LogDisplay.vue'
 const allLogLines = ref<LogEntry[]>([])
 const error = ref<string | null>(null)
 const logPath = ref<string | null>(null)
-const activeTab = ref<'request' | 'response'>('request')
+
+const getTabFromHash = () => (window.location.hash.substring(1) === 'response' ? 'response' : 'request')
+const activeTab = ref<"request" | "response">(getTabFromHash())
+
+const onHashChange = () => {
+  activeTab.value = getTabFromHash()
+}
+
+onMounted(() => window.addEventListener('hashchange', onHashChange))
+onUnmounted(() => window.removeEventListener('hashchange', onHashChange))
+
+watch(activeTab, (tab) => {
+  if (window.location.hash.substring(1) !== tab) {
+    window.location.hash = tab
+  }
+})
 
 const requestLogs = computed(() => allLogLines.value.filter(item => item.direction === 'request'))
 const responseLogs = computed(() => allLogLines.value.filter(item => item.direction === 'response'))
@@ -28,7 +43,7 @@ if (rawLogPath) {
   <main class="mx-auto pt-4 px-10 mb-10 font-sans">
     <h1 class="text-2xl font-bold mb-4">Log Viewer</h1>
     <div v-if="logPath">
-      <p class="mb-2">Loading log for: <strong class="font-bold">{{ logPath }}</strong></p>
+      <p class="mb-2">Loading log for: <a :href="logPath" class="font-bold">{{ logPath }}</a></p>
       <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4">
         {{ error }}
       </div>

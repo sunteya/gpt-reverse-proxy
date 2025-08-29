@@ -207,9 +207,10 @@ export class FinishReasonCleanerStream extends KeywordInterceptorStream {
   processPostData() {
     const target = "null"
 
-    if (this.postBuffer.startsWith(target)) {
+    const buffer = this.postBuffer.trimStart()
+    if (buffer.startsWith(target)) {
       this.preBuffer = this.preBuffer.substring(0, this.preBuffer.length - this.keyword.length)
-      this.postBuffer = this.postBuffer.substring(target.length)
+      this.postBuffer = buffer.substring(target.length)
 
       const result = this.matchKeyword(this.postBuffer)
       if (result.type == 'matched') {
@@ -223,7 +224,7 @@ export class FinishReasonCleanerStream extends KeywordInterceptorStream {
       } else {
           this.intercepted = false
       }
-    } else if (target.startsWith(this.postBuffer)) {
+    } else if (target.startsWith(buffer)) {
       // Do nothing and let the state be preserved for the next chunk.
     } else {
       this.intercepted = false
