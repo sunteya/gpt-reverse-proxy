@@ -1,7 +1,7 @@
 import { Hook, HookOnResponse } from './Hook'
 import { EndpointEnv } from './EndpointEnv'
 
-type HookRun = { hook: Hook, responses: HookOnResponse[] }
+type HookRun = { hook: Hook; responses: HookOnResponse[] }
 
 export class HookRunner {
   runs: HookRun[] = []
@@ -16,7 +16,7 @@ export class HookRunner {
     let req = request
     for (const run of this.runs) {
       req = await run.hook.onRequest(req, this.env, {
-        addResponse: fn => run.responses.push(fn)
+        addResponse: fn => run.responses.push(fn),
       })
     }
     return req

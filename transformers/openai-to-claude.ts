@@ -40,4 +40,4 @@ class OpenaiToClaudeHook extends Hook {
   }
 }
 
-export default new OpenaiToClaudeHook()
+export default OpenaiToClaudeHook

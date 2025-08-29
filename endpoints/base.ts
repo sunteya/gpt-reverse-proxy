@@ -22,7 +22,7 @@ export abstract class BaseEndpointHandler implements EndpointHandler {
     this.settings = settings
     this.upstreams = upstreams
 
-    this.hooks = hookRegistry.getHooks(settings.plugins ?? [])
+    this.hooks = hookRegistry.buildHooks(settings.plugins)
     this.balancer = new LoadBalancer(this.hooks)
   }
 

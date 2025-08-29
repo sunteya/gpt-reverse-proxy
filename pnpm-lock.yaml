@@ -38,6 +38,9 @@ importers:
       https-proxy-agent:
         specifier: 7.0.6
         version: 7.0.6
+      immutable-json-patch:
+        specifier: 6.0.2
+        version: 6.0.2
       js-yaml:
         specifier: 4.1.0
         version: 4.1.0
@@ -48,7 +51,7 @@ importers:
         specifier: 10.0.3
         version: 10.0.3
       ollama:
-        specifier: ^0.5.17
+        specifier: 0.5.17
         version: 0.5.17
       openai:
         specifier: 5.12.0
@@ -85,7 +88,7 @@ importers:
         specifier: 7.1.0
         version: 7.1.0(@types/node@24.2.0)(tsx@4.20.3)
       vite-tsconfig-paths:
-        specifier: ^5.1.4
+        specifier: 5.1.4
         version: 5.1.4(typescript@5.9.2)(vite@7.1.0(@types/node@24.2.0)(tsx@4.20.3))
       vitest:
         specifier: 3.2.4
@@ -564,6 +567,9 @@ packages:
   https-proxy-agent@7.0.6:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
+
+  immutable-json-patch@6.0.2:
+    resolution: {integrity: sha512-KwCA5DXJiyldda8SPha1zB+6+vbEi5/jRRcYii/6yFXlyu9ZjiSH/wPq8Ri2Hk8iGjjTMcHW3Z21S4MOpl7sOw==}
 
   is-extglob@2.1.1:
     resolution: {integrity: sha512-SbKbANkN603Vi4jEZv49LeVJMn4yGwsbzZworEoyEiutsN3nJYdbO36zfhGJ6QEDpOZIFkDtnq5JRxmvl3jsoQ==}
@@ -1199,6 +1205,8 @@ snapshots:
       debug: 4.4.1
     transitivePeerDependencies:
       - supports-color
+
+  immutable-json-patch@6.0.2: {}
 
   is-extglob@2.1.1: {}
 

@@ -245,12 +245,9 @@ class CursorCompatibleHook extends Hook {
       })
 
       const body = await request.clone().json()
-      if (body.temperature == 0) {
-        body.temperature = 1
-      }
-
       if (body.model == "gpt-5") {
         body.max_completion_tokens = body.max_tokens
+        body.temperature = 1
         delete body.max_tokens
       }
 
@@ -268,4 +265,4 @@ class CursorCompatibleHook extends Hook {
   }
 }
 
-export default new CursorCompatibleHook()
+export default CursorCompatibleHook

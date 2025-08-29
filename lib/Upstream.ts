@@ -13,11 +13,13 @@ export class Upstream {
   settings: UpstreamSettings
   plugins: Hook[]
 
-  get name() { return this.settings.name ?? 'unknown' }
+  get name() {
+    return this.settings.name ?? 'unknown'
+  }
 
   constructor(settings: UpstreamSettings, hookRegistry: HookRegistry) {
     this.settings = settings
-    this.plugins = hookRegistry.getHooks(settings.plugins ?? [])
+    this.plugins = hookRegistry.buildHooks(settings.plugins)
   }
 
   hasModelAliases(): boolean {
@@ -117,7 +119,11 @@ export class Upstream {
     return finalRequest
   }
 
-  async handle(rawRequest: Request, env: EndpointEnv, interceptors: Hook[] = []): Promise<Response> {
+  async handle(
+    rawRequest: Request,
+    env: EndpointEnv,
+    interceptors: Hook[] = []
+  ): Promise<Response> {
     const runner = new HookRunner([...interceptors, ...this.plugins], env)
     const request = await runner.runRequest(rawRequest)
 

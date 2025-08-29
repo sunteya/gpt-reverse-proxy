@@ -27,6 +27,6 @@ class OllamaToOpenAIHook extends Hook {
   }
 }
 
-export default new OllamaToOpenAIHook()
+export default OllamaToOpenAIHook
 
 

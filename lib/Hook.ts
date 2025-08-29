@@ -6,8 +6,13 @@ import { EventSourceMessage } from 'eventsource-parser'
 export type HookOnResponse = (response: Response, env: EndpointEnv) => Promise<Response> | Response
 export interface HookRequestContext { addResponse(handler: HookOnResponse): void }
 
-export abstract class Hook {
+export abstract class Hook<TConfig = Record<string, any>> {
   name!: string
+  config: TConfig
+
+  constructor(config: TConfig) {
+    this.config = config ?? ({} as TConfig)
+  }
 
   isStreamingResponse(response: Response): boolean {
     const contentType = response.headers.get('content-type') || ''

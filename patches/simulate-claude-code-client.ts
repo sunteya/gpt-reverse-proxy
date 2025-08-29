@@ -1,6 +1,6 @@
 import { MessageCreateParamsBase as ClaudeCompletionParams, TextBlockParam as ClaudeTextBlockParam } from '@anthropic-ai/sdk/resources/messages'
 import { EndpointEnv } from '../lib/EndpointEnv'
-import { Hook } from '../lib/Hook'
+import { Hook, HookRequestContext } from '../lib/Hook'
 import { CLAUDE_MESSAGES_PATH } from '../protocols'
 
 export class SimulateClaudeCodeClientHook extends Hook {
@@ -44,7 +44,7 @@ export class SimulateClaudeCodeClientHook extends Hook {
     })
   }
 
-  async onRequest(request: Request, env: EndpointEnv) {
+  async onRequest(request: Request, env: EndpointEnv, ctx: HookRequestContext) {
     const newRequest = this.simulateClaudeRequest(request)
 
     if (request.url.includes(CLAUDE_MESSAGES_PATH)) {
@@ -55,4 +55,4 @@ export class SimulateClaudeCodeClientHook extends Hook {
   }
 }
 
-export default new SimulateClaudeCodeClientHook()
+export default SimulateClaudeCodeClientHook

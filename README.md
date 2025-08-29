@@ -107,6 +107,20 @@ Upstream selection: match by endpoint `type` (i.e., `protocol`), then filter by 
 
 - `patches/cursor-compatible`: improve SSE compatibility with Cursor clients
 - `patches/simulate-claude-code-client`: emulate Claude CLI client behavior for better compatibility
+- `patches/json-patch-request`: applies conditional JSON patches to the request body. This is useful for modifying request payloads on the fly, for example, to alias model names.
+
+  Example configuration in `config.yml`:
+  ```yaml
+  endpoints:
+    - prefix: /cursor
+      type: openai
+      plugins:
+        patches/json-patch-request:
+          alias-gpt5: # A named ruleset
+            - {op: "test", path: "/model", value: "openai-g5"}
+            - {op: "replace", path: "/model", value: "gpt-5"}
+  ```
+
 - `transformers/openai-to-claude`: translate between OpenAI Chat Completions and Claude Messages (incl. streaming)
 - `transformers/ollama-to-openai`: provide Ollama tags/show compatibility backed by an OpenAI-compatible Models API
 

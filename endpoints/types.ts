@@ -19,7 +19,7 @@ export interface UpstreamSettings {
   api_key?: string
   https_proxy?: string | null
 
-  plugins?: string[]
+  plugins?: string[] | Record<string, any>
   models?: string[]
   model_aliases?: Record<string, string> | null
   priority?: number
@@ -30,7 +30,7 @@ export interface UpstreamSettings {
 export interface EndpointSettings {
   prefix: string
   type: UpstreamProtocol
-  plugins?: string[]
+  plugins?: string[] | Record<string, any>
 }
 
 export interface EndpointHandler {
