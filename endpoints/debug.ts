@@ -13,6 +13,11 @@ export class DebugHandler extends BaseEndpointHandler {
       rewriteRequestPath: (p) => utils.stripPrefix(p, `${prefix}/log`),
     }))
 
+    routers.use('/spec/*', serveStatic({
+      root: 'spec',
+      rewriteRequestPath: (p) => utils.stripPrefix(p, `${prefix}/spec`),
+    }))
+
     routers.use('/*', serveStatic({
       root: 'debug-ui/dist',
       rewriteRequestPath: (p) => utils.stripPrefix(p, prefix || null),

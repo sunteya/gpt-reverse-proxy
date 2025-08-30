@@ -1,22 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { FinishReasonCleanerStream } from '$$/patches/cursor-compatible'
-
-async function collectStream(stream: ReadableStream<string>): Promise<string[]> {
-  const chunks: string[] = []
-  const reader = stream.getReader()
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        break
-      }
-      chunks.push(value)
-    }
-  } finally {
-    reader.releaseLock()
-  }
-  return chunks
-}
+import { collectStream } from '$$/spec/support/test-helpers'
 
 describe('FinishReasonCleanerStream', () => {
   it('should remove finish_reason:null with leading space', async () => {

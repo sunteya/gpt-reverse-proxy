@@ -1,8 +1,9 @@
 import { createParser, type EventSourceMessage } from 'eventsource-parser'
+import _ from 'lodash'
 import { EndpointEnv } from '../lib/EndpointEnv'
 import { Hook, HookRequestContext } from '../lib/Hook'
 import { OPENAI_CHAT_COMPLETIONS_PATH } from '../protocols'
-import _, { result } from 'lodash'
+import { ReasoningToThinkTagStream } from './cursor-compatible/ReasoningToThinkTagStream'
 
 export abstract class KeywordInterceptorStream extends TransformStream<string, string> {
   preBuffer = ''
@@ -240,6 +241,7 @@ class CursorCompatibleHook extends Hook {
       ctx.addResponse((resp) => {
         return this.isStreamingResponse(resp) ? this.convert_stream_chunk_response(resp, (stream) => {
           return stream
+            .pipeThrough(new ReasoningToThinkTagStream())
             .pipeThrough(new FinishReasonCleanerStream())
             .pipeThrough(new CombineFinishChunkStream())
         }) : resp

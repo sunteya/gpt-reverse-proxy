@@ -148,6 +148,7 @@ export function claudeMessageResponseToOpenAI(message: Anthropic.Messages.Messag
 export class ClaudeToOpenAIStream extends TransformStream<EventSourceMessage, EventSourceMessage> {
   id: string | null = null
   model: string | null = null
+  toolCallChunks: Record<number, any> = {}
 
   constructor() {
     super({
@@ -164,7 +165,27 @@ export class ClaudeToOpenAIStream extends TransformStream<EventSourceMessage, Ev
       return
     }
 
-    const json = JSON.parse(source.data) as Anthropic.MessageStreamEvent
+    if (!source.event) {
+      return
+    }
+
+    if (source.event === 'message_stop') {
+      controller.enqueue({ id: source.id, data: '[DONE]' })
+      controller.terminate()
+      return
+    }
+
+    if (!source.data || source.data.trim() === '') {
+      return
+    }
+
+    let json: Anthropic.MessageStreamEvent
+    try {
+      json = JSON.parse(source.data)
+    } catch (e) {
+      // Not a JSON object, probably a ping or something else we can ignore
+      return
+    }
 
     if (json.type === 'message_start') {
       const { message } = json as Anthropic.Messages.MessageStartEvent
@@ -211,16 +232,6 @@ export class ClaudeToOpenAIStream extends TransformStream<EventSourceMessage, Ev
       return
     }
 
-    if (json.type === 'content_block_delta') {
-      const { delta } = json as Anthropic.Messages.ContentBlockDeltaEvent
-      if (delta.type === 'text_delta') {
-        chunk.choices![0].delta = { content: delta.text }
-        controller.enqueue({ id: source.id, data: JSON.stringify(chunk) })
-      }
-      // Can handle tool deltas here in the future
-      return
-    }
-
     if (json.type === 'message_delta') {
       const { delta } = json as Anthropic.Messages.MessageDeltaEvent
       if (delta.stop_reason) {
@@ -231,13 +242,43 @@ export class ClaudeToOpenAIStream extends TransformStream<EventSourceMessage, Ev
           stop_sequence: 'stop'
         }
         chunk.choices![0].finish_reason = finishReasonMapping[delta.stop_reason]
+        if (delta.stop_reason === 'tool_use') {
+          chunk.choices![0].delta = {
+            tool_calls: Object.values(this.toolCallChunks)
+          }
+          this.toolCallChunks = {}
+        }
         // The delta is empty in this case, which is correct for a finish_reason chunk
         controller.enqueue({ id: source.id, data: JSON.stringify(chunk) })
       }
       return
     }
 
-    // Do not enqueue for unhandled events like:
-    // content_block_start, content_block_stop, ping
+    if (json.type === 'content_block_start') {
+      const { content_block, index } = json as Anthropic.Messages.ContentBlockStartEvent
+      if (content_block.type === 'tool_use') {
+        this.toolCallChunks[index] = {
+          index,
+          id: content_block.id,
+          type: 'function',
+          function: {
+            name: content_block.name,
+            arguments: ''
+          }
+        }
+      }
+    }
+
+    if (json.type === 'content_block_delta') {
+      const { delta, index } = json as Anthropic.Messages.ContentBlockDeltaEvent
+      if (delta.type === 'input_json_delta') {
+        if (this.toolCallChunks[index]) {
+          this.toolCallChunks[index].function.arguments += delta.partial_json
+        }
+      } else if (delta.type === 'text_delta') {
+        chunk.choices![0].delta = { content: delta.text }
+        controller.enqueue({ id: source.id, data: JSON.stringify(chunk) })
+      }
+    }
   }
 }

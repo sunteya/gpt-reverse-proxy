@@ -3,24 +3,7 @@ import { CombineFinishChunkStream, FinishReasonCleanerStream } from '$$/patches/
 import fs from 'fs/promises'
 import path from 'path'
 import { createParser, EventSourceMessage } from 'eventsource-parser'
-import { loadChunksFromLogFile } from '$$/spec/support/test-helpers'
-
-async function collectStream(stream: ReadableStream<string>): Promise<string[]> {
-  const chunks: string[] = []
-  const reader = stream.getReader()
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        break
-      }
-      chunks.push(value)
-    }
-  } finally {
-    reader.releaseLock()
-  }
-  return chunks
-}
+import { loadChunksFromLogFile, collectStream } from '$$/spec/support/test-helpers'
 
 describe('CombineFinishChunkStream', () => {
   const files = [
