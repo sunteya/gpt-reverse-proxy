@@ -20,7 +20,9 @@ export class ReasoningToThinkTagStream extends TransformStream<string, string> {
 
   transform(chunk: string, controller: TransformStreamDefaultController<string>) {
     if (this.state == 'passthrough') {
-      controller.enqueue(chunk)
+      const dataToPass = this.postBuffer + chunk
+      this.postBuffer = ''
+      controller.enqueue(dataToPass)
       return
     }
 
@@ -77,7 +79,7 @@ export class ReasoningToThinkTagStream extends TransformStream<string, string> {
     }
 
     if (this.state == 'passthrough') {
-      this.finalizeAndFlush(controller)
+      this.flushReasoningAndPostEvents(controller)
     } else {
       while (true) {
         if (this.reasoningEvents.length <= 1) {
@@ -90,7 +92,7 @@ export class ReasoningToThinkTagStream extends TransformStream<string, string> {
     }
   }
 
-  finalizeAndFlush(controller: TransformStreamDefaultController<string>) {
+  flushReasoningAndPostEvents(controller: TransformStreamDefaultController<string>) {
     for (let i = 0; i < this.reasoningEvents.length; i++) {
       const event = this.reasoningEvents[i]
       if (i == this.reasoningEvents.length - 1) {
@@ -107,6 +109,10 @@ export class ReasoningToThinkTagStream extends TransformStream<string, string> {
       this.encoder.transform(event, controller)
     }
     this.postEvents = []
+  }
+
+  finalizeAndFlush(controller: TransformStreamDefaultController<string>) {
+    this.flushReasoningAndPostEvents(controller)
 
     if (this.postBuffer) {
       controller.enqueue(this.postBuffer)

@@ -3,10 +3,11 @@ import { ClaudeToOpenAIStream } from '$$/protocols/completion-openai-to-claude'
 import { loadChunksFromLogFile, collectStream } from '$$/spec/support/test-helpers'
 import { createParser, EventSourceMessage } from 'eventsource-parser'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
+import path from 'path'
 
 describe('ClaudeToOpenAIStream', () => {
   it('should correctly convert tool call', async () => {
-    const inputEntries = await loadChunksFromLogFile(__dirname, "ClaudeToOpenAIStream.20250829141539904.jsonl")
+    const inputEntries = await loadChunksFromLogFile(path.join(__dirname, "ClaudeToOpenAIStream.20250829141539904.jsonl"))
     const inputStream = new ReadableStream<string>({
       start(controller) {
         inputEntries

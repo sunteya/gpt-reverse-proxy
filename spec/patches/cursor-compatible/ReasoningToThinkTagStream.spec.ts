@@ -1,46 +1,37 @@
 import { ReasoningToThinkTagStream } from '$$/patches/cursor-compatible/ReasoningToThinkTagStream'
-import { collectStream, loadChunksFromLogFile } from '$$/spec/support/test-helpers'
+import { collectStream, convertLogFileToEvents, loadChunksFromLogFile } from '$$/spec/support/test-helpers'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
+import _ from 'lodash'
+import path from 'path'
 import { describe, it, expect } from 'vitest'
 
 describe('ReasoningToThinkTagStream', () => {
   const files = [
-    "ReasoningToThinkTagStream.20250828164422336.jsonl",
+    // "ReasoningToThinkTagStream.20250828164422336.jsonl",
+    "ReasoningToThinkTagStream.20250901013959775.jsonl",
   ]
   for (const file of files) {
     it(`should process stream from log file ${file}`, async () => {
-      const inputEntries = await loadChunksFromLogFile(__dirname, file)
-
-      const inputStream = new ReadableStream<string>({
-        start(controller) {
-          inputEntries
-            .filter(it => it.leg == 'upstream' && it.direction == 'response' && it.event == 'chunk')
-            .forEach(it => controller.enqueue(it.payload.text + "\n\n"))
-          controller.close()
-        }
-      })
-
-      const subject = new ReasoningToThinkTagStream()
-      const events = await collectStream(
-        inputStream.pipeThrough(subject)
-                   .pipeThrough(new EventSourceParserStream())
-      )
-
+      const events = await convertLogFileToEvents(path.join(__dirname, file), new ReasoningToThinkTagStream())
       const messages = events.filter(it => it.data != '[DONE]').map(it => JSON.parse(it.data))
 
       let indexFirst = -1
       let indexLast = -1
       for (let i = 0; i < messages.length; i++) {
-        if (messages[i].choices?.[0].delta?.reasoning_content) {
+        const message = messages[i]
+        const content = _.get(message, 'choices.0.delta.content', '')
+        if (content.startsWith('<think>')) {
           indexFirst = i
-          break
-        } else {
-          indexLast = i - 1
         }
+        if (content.endsWith('</think>')) {
+          indexLast = i
+        }
+
+        // console.log(JSON.stringify(message, null, 2))
       }
 
-      expect(messages.at(indexFirst)!.choices[0].delta.content).toContain('<think>')
-      expect(messages.at(indexLast)!.choices[0].delta.content).not.toContain('</think>')
+      expect(indexFirst).not.toBe(-1)
+      expect(indexLast).not.toBe(-1)
     })
   }
 })
