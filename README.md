@@ -26,6 +26,7 @@ endpoints:
 
   # - prefix: /any/path
   #   type: ollama # openai, ollama, claude
+  #   group: test # Only looks for upstream groups that are 'test' or empty
 
 upstreams:
   - name: anything
@@ -56,6 +57,7 @@ upstreams:
   #     - transformers/openai-to-claude
   #   api_base: https://<your-openai-like-host>
   #   api_key: <your-api-key>
+  #   group: test
 ```
 
 3. Run locally

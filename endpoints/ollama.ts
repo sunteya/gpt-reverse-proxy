@@ -6,7 +6,11 @@ import { OPENAI_CHAT_COMPLETIONS_PATH } from '../protocols'
 
 export class OllamaHandler extends BaseEndpointHandler {
   async handle_api_tags(request: Request, env: EndpointEnv) {
-    const upstreams = this.upstreams.findAll({ protocol: this.settings.type, model: null })
+    const upstreams = this.upstreams.findAll({
+      protocol: this.settings.type,
+      model: null,
+      group: this.settings.group,
+    })
     const results = await Promise.allSettled(
       upstreams.map(u => u.handle(request.clone(), env, this.hooks).then(r => r.json()))
     )
@@ -47,7 +51,11 @@ export class OllamaHandler extends BaseEndpointHandler {
     const req = request.clone()
     const json = await req.json()
     const model = String(json?.model)
-    const candidates = this.upstreams.findAll({ protocol: this.settings.type, model })
+    const candidates = this.upstreams.findAll({
+      protocol: this.settings.type,
+      model,
+      group: this.settings.group,
+    })
     return this.balancer.forward(candidates, request, env)
   }
 

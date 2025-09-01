@@ -8,6 +8,7 @@ import { dumpRequest, dumpResponse } from './Dumper'
 import { HookRunner } from './HookRunner'
 import { OPENAI_CHAT_COMPLETIONS_PATH } from '../protocols/openai'
 import { CLAUDE_MESSAGES_PATH } from '../protocols/claude'
+import { O } from 'ollama/dist/shared/ollama.f6eae8b3'
 
 export class Upstream {
   settings: UpstreamSettings
@@ -20,15 +21,6 @@ export class Upstream {
   constructor(settings: UpstreamSettings, hookRegistry: HookRegistry) {
     this.settings = settings
     this.plugins = hookRegistry.buildHooks(settings.plugins)
-  }
-
-  hasModelAliases(): boolean {
-    const aliases = this.settings.model_aliases
-    if (!aliases || typeof aliases !== 'object' || Array.isArray(aliases)) {
-      return false
-    }
-
-    return !!Object.keys(aliases).length
   }
 
   isModelEndpointPath(pathname: string): boolean {
@@ -49,41 +41,7 @@ export class Upstream {
     return false
   }
 
-  async applyModelAliasIfNeeded(request: Request): Promise<Request> {
-    if (!this.hasModelAliases()) { return request }
-
-    const pathname = new URL(request.url).pathname
-    if (!this.isModelEndpointPath(pathname)) { return request }
-
-    const contentType = request.headers.get('content-type') || ''
-    if (!contentType.includes('application/json')) { return request }
-
-    let json: any
-    try {
-      json = await request.clone().json()
-    } catch {
-      return request
-    }
-    if (!json || typeof json !== 'object') {
-      return request
-    }
-
-    const originalModel = json.model
-    if (!originalModel) { return request }
-    const modelKey = String(originalModel)
-    const mapped = this.settings.model_aliases ? this.settings.model_aliases[modelKey] : undefined
-    if (!mapped) { return request }
-
-    const headers = new Headers(request.headers)
-    return new Request(request.url, {
-      method: request.method,
-      headers,
-      body: JSON.stringify({ ...json, model: mapped })
-    })
-  }
-
   async buildUpstreamRequest(request: Request): Promise<Request> {
-    const aliasedRequest = await this.applyModelAliasIfNeeded(request)
     const remoteUrl = new URL(this.settings.api_base)
     const requestUrl = new URL(request.url)
 
@@ -101,19 +59,26 @@ export class Upstream {
       targetUrl.pathname = `${remotePath}/${incomingPath}`
     }
 
-    const headers = new Headers(aliasedRequest.headers)
+    const headers = new Headers(request.headers)
     headers.delete('host')
     headers.delete('content-length')
     headers.delete('content-encoding')
+    
+    headers.delete('x-forwarded-for')
+    headers.delete('x-forwarded-host')
+    headers.delete('x-forwarded-port')
+    headers.delete('x-forwarded-proto')
+    headers.delete('x-forwarded-server')
+
     // headers.delete('accept-encoding')
     if (this.settings.api_key) {
       headers.set('authorization', `Bearer ${this.settings.api_key}`)
     }
 
     const finalRequest = new Request(targetUrl.toString(), {
-      method: aliasedRequest.method,
+      method: request.method,
       headers,
-      body: aliasedRequest.body,
+      body: request.body,
     })
 
     return finalRequest

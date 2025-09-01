@@ -75,7 +75,11 @@ export abstract class BaseEndpointHandler implements EndpointHandler {
   }
 
   async handle_remaining_routes(request: Request, env: EndpointEnv) {
-    const candidates = this.upstreams.findAll({ protocol: this.settings.type, model: null })
+    const candidates = this.upstreams.findAll({
+      protocol: this.settings.type,
+      model: null,
+      group: this.settings.group,
+    })
     return this.balancer.forward(candidates, request, env)
   }
 

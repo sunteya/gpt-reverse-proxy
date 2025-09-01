@@ -9,7 +9,11 @@ export class OpenAIHandler extends BaseEndpointHandler {
     const req = request.clone()
     const json = await req.json()
     const model = String(json?.model)
-    const candidates = this.upstreams.findAll({ protocol: this.settings.type, model })
+    const candidates = this.upstreams.findAll({
+      protocol: this.settings.type,
+      model,
+      group: this.settings.group,
+    })
     return this.balancer.forward(candidates, request, env)
   }
 

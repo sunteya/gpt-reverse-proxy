@@ -6,7 +6,7 @@ import { minimatch } from 'minimatch'
 import consola from 'consola'
 import { Breaker } from './Breaker'
 
-export type FindUpstreamConds = { model?: string | null; protocol?: UpstreamProtocol | null }
+export type FindUpstreamConds = { model?: string | null; protocol?: UpstreamProtocol | null; group?: string | null }
 
 export class UpstreamRegistry {
   config: UpstreamSettings[]
@@ -35,7 +35,7 @@ export class UpstreamRegistry {
 
   matchSettings(conds: FindUpstreamConds): UpstreamSettings[] {
     consola.info(`Matching settings for: ${JSON.stringify(conds)}`)
-    const matches = this.config.filter(settings => this.isMatchProtocol(settings, conds.protocol) && this.isMatchModel(settings, conds.model))
+    const matches = this.config.filter(settings => this.isMatchProtocol(settings, conds.protocol) && this.isMatchModel(settings, conds.model) && this.isMatchGroup(settings, conds.group))
     const healthy = matches.filter(s => !this.breaker.isOpen(s.name))
     const list = healthy.length ? healthy : (matches.length ? [matches.slice().sort((a, b) => this.breaker.openUntil(a.name) - this.breaker.openUntil(b.name))[0]] : [])
     consola.info(`Found ${list.length} settings for: ${JSON.stringify(conds)}`)
@@ -46,6 +46,11 @@ export class UpstreamRegistry {
     if (!protocol) { return true }
     if (!settings.protocols) { return true }
     return settings.protocols.includes(protocol)
+  }
+
+  isMatchGroup(settings: UpstreamSettings, group: string | null | undefined) {
+    if (!group) { return true }
+    return settings.group === group
   }
 
   isMatchModel(settings: UpstreamSettings, model: string | null | undefined) {

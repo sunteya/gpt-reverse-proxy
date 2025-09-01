@@ -18,10 +18,10 @@ export interface UpstreamSettings {
   api_base: string
   api_key?: string
   https_proxy?: string | null
+  group?: string
 
   plugins?: string[] | Record<string, any>
   models?: string[]
-  model_aliases?: Record<string, string> | null
   priority?: number
   retry?: RetrySettings
   breaker?: BreakerSettings
@@ -31,6 +31,7 @@ export interface EndpointSettings {
   prefix: string
   type: UpstreamProtocol
   plugins?: string[] | Record<string, any>
+  group?: string
 }
 
 export interface EndpointHandler {
