@@ -17,7 +17,15 @@ class JsonPatchRequestHook extends Hook<Record<string, JSONPatchDocument>> {
 
       for (const key in config) {
         const operations = config[key]
-        document = immutableJSONPatch(document, operations)
+        try {
+          document = immutableJSONPatch(document, operations)
+        } catch (error) {
+          if (error instanceof Error && error.message.includes('Test failed')) {
+            continue
+          }
+
+          throw error
+        }
       }
 
       const headers = new Headers(request.headers)

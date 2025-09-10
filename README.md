@@ -22,7 +22,9 @@ endpoints:
   - prefix: /cursor # recommend add a random string for secret
     type: openai
     plugins:
-      - patches/cursor-compatible # fixes cursor compatibility issues
+      # patches/reasoning-to-think:
+      patches/cursor-compatible: # fixes cursor compatibility issues
+
 
   # - prefix: /any/path
   #   type: ollama # openai, ollama, claude
@@ -113,14 +115,20 @@ Upstream selection: match by endpoint `type` (i.e., `protocol`), then filter by 
 
   Example configuration in `config.yml`:
   ```yaml
-  endpoints:
-    - prefix: /cursor
-      type: openai
       plugins:
         patches/json-patch-request:
           alias-gpt5: # A named ruleset
             - {op: "test", path: "/model", value: "openai-g5"}
             - {op: "replace", path: "/model", value: "gpt-5"}
+  ```
+
+- `patches/reasoning-to-think`: Handles `<think>` tags by stripping them from requests and re-inserting them into streaming responses. This is useful for models that use `<think>` tags for reasoning. The plugin can be configured with a list of `minimatch` patterns to only apply to specific models.
+
+  Example configuration in `config.yml`:
+  ```yaml
+      plugins:
+        patches/reasoning-to-think:
+          - gemini-2.5-pro
   ```
 
 - `transformers/openai-to-claude`: translate between OpenAI Chat Completions and Claude Messages (incl. streaming)

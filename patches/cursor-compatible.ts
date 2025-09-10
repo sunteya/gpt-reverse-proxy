@@ -2,7 +2,6 @@ import _ from 'lodash'
 import { EndpointEnv } from '../lib/EndpointEnv'
 import { Hook, HookRequestContext } from '../lib/Hook'
 import { OPENAI_CHAT_COMPLETIONS_PATH } from '../protocols'
-import { ReasoningToThinkTagStream } from './cursor-compatible/ReasoningToThinkTagStream'
 import { CombineFinishChunkStream } from './cursor-compatible/CombineFinishChunkStream'
 import { FinishReasonCleanerStream } from './cursor-compatible/FinishReasonCleanerStream'
 
@@ -14,7 +13,6 @@ class CursorCompatibleHook extends Hook {
       ctx.addResponse((resp) => {
         return this.isStreamingResponse(resp) ? this.convert_stream_chunk_response(resp, (stream) => {
           return stream
-            .pipeThrough(new ReasoningToThinkTagStream())
             .pipeThrough(new FinishReasonCleanerStream())
             .pipeThrough(new CombineFinishChunkStream())
         }) : resp

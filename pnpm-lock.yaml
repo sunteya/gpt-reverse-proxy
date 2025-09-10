@@ -66,9 +66,6 @@ importers:
       '@types/dotenv-flow':
         specifier: 3.3.3
         version: 3.3.3
-      '@types/glob':
-        specifier: ^9.0.0
-        version: 9.0.0
       '@types/js-yaml':
         specifier: 4.0.9
         version: 4.0.9
@@ -397,10 +394,6 @@ packages:
 
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
-
-  '@types/glob@9.0.0':
-    resolution: {integrity: sha512-00UxlRaIUvYm4R4W9WYkN8/J+kV8fmOQ7okeH6YFtGWFMt3odD45tpG5yA5wnL7HE6lLgjaTW5n14ju2hl2NNA==}
-    deprecated: This is a stub types definition. glob provides its own type definitions, so you do not need this installed.
 
   '@types/http-proxy@1.17.16':
     resolution: {integrity: sha512-sdWoUajOB1cd0A8cRRQ1cfyWNbmFKLAqBB89Y8x5iYyG/mkJHc0YUH8pdWBy2omi9qtCpiIgGjuwO0dQST2l5w==}
@@ -1145,10 +1138,6 @@ snapshots:
   '@types/dotenv-flow@3.3.3': {}
 
   '@types/estree@1.0.8': {}
-
-  '@types/glob@9.0.0':
-    dependencies:
-      glob: 11.0.3
 
   '@types/http-proxy@1.17.16':
     dependencies:

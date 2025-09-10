@@ -26,7 +26,7 @@ export async function collectStream<T>(stream: ReadableStream<T>): Promise<T[]> 
   return chunks
 }
 
-export async function convertLogFileToEvents(file: string, subject: TransformStream<string, string>): Promise<EventSourceMessage[]> {
+export async function convertLogFileToEvents(file: string, subject: TransformStream<string, string>) {
   const inputEntries = await loadChunksFromLogFile(file)
   const inputStream = new ReadableStream<string>({
     start(controller) {

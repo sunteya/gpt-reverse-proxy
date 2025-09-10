@@ -7,6 +7,34 @@ export class CombineFinishChunkStream extends KeywordInterceptorStream {
   keyword = ',"finish_reason":'
   encoder = new EventSourceEncoderStream()
 
+  transform(chunk: string, controller: TransformStreamDefaultController<string>) {
+    super.transform(chunk, controller)
+    if (this.intercepted) {
+      const finishEndIndex = this.postBuffer.indexOf("\n\n")
+      const remainingBuffer = this.postBuffer.substring(finishEndIndex + 2)
+      const messages = this.convertBufferToMessages(remainingBuffer)
+
+      if (messages.length >= 2) {
+        this.flush(controller)
+      }
+    }
+  }
+
+  convertBufferToMessages(buffer: string) {
+    const messages = [] as EventSourceMessage[]
+    const parser = createParser({
+      onEvent: (event: EventSourceMessage) => {
+        if (event.data == '[DONE]') {
+          return
+        }
+
+        messages.push(event)
+      }
+    })
+    parser.feed(buffer)
+    return messages
+  }
+
   processPostData() {
     const nullTarget = 'null'
 
@@ -44,18 +72,7 @@ export class CombineFinishChunkStream extends KeywordInterceptorStream {
     // enqueue remaining buffer
     this.enqueueBuffer(controller)
 
-    const messages = [] as EventSourceMessage[]
-    const parser = createParser({
-      onEvent: (event: EventSourceMessage) => {
-        if (event.data == '[DONE]') {
-          return
-        }
-
-        if (event.data) { messages.push(event) }
-      },
-    })
-    parser.feed(remainingBuffer)
-
+    const messages = this.convertBufferToMessages(remainingBuffer)
     if (messages.length > 0) {
       const last = messages.at(-1)
       if (!last!.data.includes('"finish_reason"')) {
@@ -93,6 +110,10 @@ export class CombineFinishChunkStream extends KeywordInterceptorStream {
     // }
 
     this.encoder.transform({ data: "[DONE]" }, controller)
+
+    this.preBuffer = ''
+    this.postBuffer = ''
+    controller.terminate()
   }
 
   combineMessages(messages: EventSourceMessage[], finishReason: string | undefined): EventSourceMessage {
